@@ -1,14 +1,11 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const { update } = useSession();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,9 +30,9 @@ export default function ChangePasswordPage() {
     setLoading(false);
 
     if (res.ok) {
-      await update({ mustChangePassword: false });
-      router.push("/dashboard");
-      router.refresh();
+      // Sign out to force a fresh JWT without mustChangePassword:true
+      await signOut({ redirect: false });
+      router.push("/login");
     } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error ?? "Erro ao atualizar senha. Tente novamente.");
