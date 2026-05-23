@@ -102,11 +102,16 @@ async function getAccountDetails(
   customerId: string,
   accessToken: string
 ): Promise<GoogleAdsAccount> {
-  const res = await fetch(`${BASE_URL}/customers/${customerId}`, {
+  const res = await fetch(`${BASE_URL}/customers/${customerId}/googleAds:search`, {
+    method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      query: "SELECT customer.id, customer.descriptive_name, customer.currency_code, customer.time_zone, customer.manager FROM customer LIMIT 1",
+    }),
   });
 
   if (!res.ok) {
@@ -115,12 +120,14 @@ async function getAccountDetails(
   }
 
   const data = await res.json();
+  const customer = (data.results?.[0]?.customer ?? {}) as Record<string, unknown>;
+
   return {
     customerId,
-    descriptiveName: data.descriptiveName ?? `Conta ${customerId}`,
-    currencyCode: data.currencyCode ?? "BRL",
-    timeZone: data.timeZone ?? "America/Sao_Paulo",
-    isManagerAccount: data.manager ?? false,
+    descriptiveName: (customer.descriptiveName as string) || `Conta ${formatCustomerId(customerId)}`,
+    currencyCode: (customer.currencyCode as string) ?? "BRL",
+    timeZone: (customer.timeZone as string) ?? "America/Sao_Paulo",
+    isManagerAccount: (customer.manager as boolean) ?? false,
   };
 }
 
