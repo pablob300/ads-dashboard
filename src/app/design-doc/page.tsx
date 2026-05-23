@@ -521,6 +521,134 @@ export default function DesignDocPage() {
           </div>
         </section>
 
+        {/* Política de Privacidade e Uso de Dados */}
+        <section className="space-y-6" id="privacidade">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Política de Privacidade e Uso de Dados</h2>
+          </div>
+          <p className="text-gray-500 leading-relaxed">
+            A B300 respeita integralmente a privacidade de seus usuários. Esta política descreve de forma
+            transparente quais informações são utilizadas pelo B300 Dashboard e, principalmente, o que
+            nunca será feito com elas.
+          </p>
+
+          {/* Princípio central */}
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-6 space-y-2">
+            <p className="font-bold text-green-800 text-lg">Princípio fundamental</p>
+            <p className="text-green-700 leading-relaxed">
+              Nenhum dado, credencial, token de acesso ou conexão fornecida pelo usuário é utilizado
+              para qualquer finalidade além de exibir as métricas de campanhas dentro do próprio dashboard.
+              Seus dados são seus. Ponto.
+            </p>
+          </div>
+
+          {/* Blocos de política */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* O que coletamos */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <p className="font-semibold text-gray-900">O que armazenamos</p>
+              </div>
+              <ul className="text-sm text-gray-500 leading-relaxed space-y-1.5">
+                <li className="flex gap-2"><span className="text-gray-300 shrink-0">—</span>E-mail e senha (criptografados) para acesso ao sistema</li>
+                <li className="flex gap-2"><span className="text-gray-300 shrink-0">—</span>Tokens de acesso OAuth do Google Ads e Meta Ads, necessários para consultar as métricas das campanhas</li>
+                <li className="flex gap-2"><span className="text-gray-300 shrink-0">—</span>Identificadores das contas de anúncios vinculadas e apelidos personalizados</li>
+                <li className="flex gap-2"><span className="text-gray-300 shrink-0">—</span>Nomes dos clientes cadastrados no sistema</li>
+              </ul>
+            </div>
+
+            {/* O que NÃO fazemos */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                </div>
+                <p className="font-semibold text-gray-900">O que jamais fazemos</p>
+              </div>
+              <ul className="text-sm text-gray-500 leading-relaxed space-y-1.5">
+                <li className="flex gap-2"><span className="text-red-300 shrink-0">✕</span>Não compartilhamos dados com terceiros</li>
+                <li className="flex gap-2"><span className="text-red-300 shrink-0">✕</span>Não vendemos nem monetizamos qualquer informação do usuário</li>
+                <li className="flex gap-2"><span className="text-red-300 shrink-0">✕</span>Não acessamos contas de anúncios para fins além da leitura de métricas</li>
+                <li className="flex gap-2"><span className="text-red-300 shrink-0">✕</span>Não utilizamos dados de campanhas para análise, benchmarking ou inteligência de mercado</li>
+                <li className="flex gap-2"><span className="text-red-300 shrink-0">✕</span>Não enviamos comunicações de marketing ou publicidade</li>
+                <li className="flex gap-2"><span className="text-red-300 shrink-0">✕</span>Não rastreamos o comportamento do usuário dentro ou fora do sistema</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Detalhes sobre tokens OAuth */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <p className="font-semibold text-gray-900">Como usamos os tokens OAuth (Google Ads e Meta Ads)</p>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Ao conectar uma conta do Google Ads ou do Meta Ads, o usuário autoriza o B300 Dashboard a
+              consultar — em seu nome — os dados de desempenho das campanhas. Esse acesso é realizado
+              exclusivamente por meio dos fluxos oficiais de autorização fornecidos pelo Google e pelo Meta,
+              sem que nenhuma senha seja conhecida ou armazenada pelo sistema.
+            </p>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Os tokens de acesso gerados por essa autorização são utilizados <strong className="text-gray-700">apenas para buscar as métricas
+              de campanhas</strong> exibidas no dashboard do respectivo cliente. Nenhuma outra operação é realizada
+              nas contas vinculadas: o sistema não cria, altera, pausa, ativa ou exclui campanhas, conjuntos
+              de anúncios, anúncios ou qualquer outro elemento das plataformas.
+            </p>
+            <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-4 border border-gray-100">
+              <svg className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Os tokens são armazenados com criptografia no banco de dados e renovados automaticamente
+                conforme necessário. O usuário pode revogar o acesso a qualquer momento diretamente nas
+                configurações de segurança da sua conta Google ou Meta, sem precisar contatar a B300.
+              </p>
+            </div>
+          </div>
+
+          {/* Acesso ao sistema */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+            <p className="font-semibold text-gray-900">Acesso ao sistema</p>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              O B300 Dashboard é um sistema de uso restrito, com acesso mediante convite e cadastro
+              autorizado. Não há criação de contas públicas. Cada usuário acessa exclusivamente os
+              clientes e contas vinculados à sua própria conta no sistema — não há visibilidade
+              cruzada entre usuários distintos.
+            </p>
+          </div>
+
+          {/* Contato */}
+          <div className="border border-gray-200 rounded-xl p-5 flex gap-4 items-start">
+            <div className="shrink-0 w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 text-sm">Dúvidas sobre privacidade</p>
+              <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                Em caso de dúvidas sobre o tratamento de dados ou para solicitar a exclusão de informações,
+                entre em contato diretamente com o administrador do sistema em{" "}
+                <span className="text-blue-600 font-medium">pablodavi@gmail.com</span>.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-400">
+            Última atualização: maio de 2026. Esta política se aplica exclusivamente ao B300 Dashboard
+            e às integrações com Google Ads e Meta Ads por ele gerenciadas.
+          </p>
+        </section>
+
       </main>
 
       {/* Footer */}
