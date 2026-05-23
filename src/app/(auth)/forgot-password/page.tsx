@@ -50,10 +50,6 @@ export default function ForgotPasswordPage() {
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg px-4 py-4 text-center">
                 Se o e-mail estiver cadastrado, você receberá a senha temporária em instantes.
-                <br />
-                <span className="text-xs text-green-600 mt-1 block">
-                  (Em modo dev, a senha aparece no terminal do servidor)
-                </span>
               </div>
               <Link
                 href="/login"
