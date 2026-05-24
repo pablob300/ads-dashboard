@@ -41,6 +41,8 @@ export interface GoogleAdsAccount {
   currencyCode: string;
   timeZone: string;
   isManagerAccount: boolean;
+  mccId?: string;
+  mccName?: string;
 }
 
 export async function listAccessibleAccounts(tokens: TokenSet): Promise<GoogleAdsAccount[]> {
@@ -70,9 +72,8 @@ export async function listAccessibleAccounts(tokens: TokenSet): Promise<GoogleAd
 
   const resourceNames: string[] = data.resourceNames ?? [];
 
-  // Tenta buscar detalhes de cada conta — se falhar (token de teste), usa o ID como nome
   const chunks = chunkArray(resourceNames, 10);
-  const allAccounts: GoogleAdsAccount[] = [];
+  const topLevelAccounts: GoogleAdsAccount[] = [];
 
   for (const chunk of chunks) {
     const results = await Promise.all(
@@ -81,7 +82,6 @@ export async function listAccessibleAccounts(tokens: TokenSet): Promise<GoogleAd
         try {
           return await getAccountDetails(customerId, accessToken);
         } catch {
-          // Fallback: retorna conta com ID formatado (token de teste sem Basic Access)
           return {
             customerId,
             descriptiveName: formatCustomerId(customerId),
@@ -92,10 +92,80 @@ export async function listAccessibleAccounts(tokens: TokenSet): Promise<GoogleAd
         }
       })
     );
-    allAccounts.push(...results.filter((a): a is GoogleAdsAccount => a !== null));
+    topLevelAccounts.push(...results.filter((a): a is GoogleAdsAccount => a !== null));
   }
 
-  return allAccounts;
+  // Expande contas MCC: busca os filhos e os adiciona com mccId/mccName
+  const childIds = new Set<string>();
+  const mccChildren: GoogleAdsAccount[] = [];
+
+  await Promise.all(
+    topLevelAccounts
+      .filter((a) => a.isManagerAccount)
+      .map(async (mcc) => {
+        try {
+          const children = await listMccChildAccounts(mcc.customerId, accessToken);
+          children.forEach((child) => {
+            childIds.add(child.customerId);
+            mccChildren.push({ ...child, mccId: mcc.customerId, mccName: mcc.descriptiveName });
+          });
+        } catch {
+          // MCC sem filhos acessíveis — mantém a conta MCC como estava
+        }
+      })
+  );
+
+  // Resultado final: MCCs + seus filhos + contas standalone não duplicadas
+  const final: GoogleAdsAccount[] = [];
+  for (const account of topLevelAccounts) {
+    if (account.isManagerAccount) {
+      final.push(account);
+      final.push(...mccChildren.filter((c) => c.mccId === account.customerId));
+    } else if (!childIds.has(account.customerId)) {
+      final.push(account);
+    }
+  }
+
+  return final;
+}
+
+async function listMccChildAccounts(
+  mccCustomerId: string,
+  accessToken: string
+): Promise<GoogleAdsAccount[]> {
+  const res = await fetch(`${BASE_URL}/customers/${mccCustomerId}/googleAds:search`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
+      "login-customer-id": mccCustomerId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query:
+        "SELECT customer_client.id, customer_client.descriptive_name, customer_client.currency_code, customer_client.time_zone, customer_client.manager, customer_client.level FROM customer_client WHERE customer_client.level = 1 AND customer_client.manager = false",
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to list MCC children for ${mccCustomerId}: ${err.slice(0, 100)}`);
+  }
+
+  const data = await res.json();
+  const results: Record<string, unknown>[] = data.results ?? [];
+
+  return results.map((r) => {
+    const cc = (r.customerClient ?? {}) as Record<string, unknown>;
+    const id = String(cc.id ?? "");
+    return {
+      customerId: id,
+      descriptiveName: (cc.descriptiveName as string) || `Conta ${formatCustomerId(id)}`,
+      currencyCode: (cc.currencyCode as string) ?? "BRL",
+      timeZone: (cc.timeZone as string) ?? "America/Sao_Paulo",
+      isManagerAccount: false,
+    };
+  });
 }
 
 async function getAccountDetails(

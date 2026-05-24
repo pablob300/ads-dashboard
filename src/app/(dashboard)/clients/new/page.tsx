@@ -12,6 +12,8 @@ interface GoogleAccount {
   isManagerAccount: boolean;
   connectionId: string;
   googleEmail: string;
+  mccId?: string;
+  mccName?: string;
 }
 
 interface MetaAccount {
@@ -160,27 +162,11 @@ export default function NewClientPage() {
               <a href="/integrations/google" className="text-blue-600 hover:underline">Conectar Google Ads</a>
             </div>
           ) : (
-            <div className="space-y-2">
-              {googleAccounts.map((account) => {
-                const selected = selectedGoogle.has(account.customerId);
-                return (
-                  <button key={account.customerId} type="button" onClick={() => toggleGoogle(account.customerId)}
-                    className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg border transition ${selected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
-                  >
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition ${selected ? "bg-blue-600 border-blue-600" : "border-slate-300"}`}>
-                      {selected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-800 truncate">{account.descriptiveName}</p>
-                        {account.isManagerAccount && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium shrink-0">MCC</span>}
-                      </div>
-                      <p className="text-xs text-slate-400">ID: {account.customerId} · {account.googleEmail}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <GoogleAccountList
+              accounts={googleAccounts}
+              selected={selectedGoogle}
+              onToggle={toggleGoogle}
+            />
           )}
         </div>
 
@@ -243,6 +229,67 @@ export default function NewClientPage() {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function GoogleAccountList({
+  accounts,
+  selected,
+  onToggle,
+}: {
+  accounts: GoogleAccount[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  const mccAccounts = accounts.filter((a) => a.isManagerAccount);
+  const standaloneAccounts = accounts.filter((a) => !a.isManagerAccount && !a.mccId);
+
+  function AccountRow({ account, indented = false }: { account: GoogleAccount; indented?: boolean }) {
+    const sel = selected.has(account.customerId);
+    return (
+      <button
+        type="button"
+        onClick={() => onToggle(account.customerId)}
+        className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg border transition ${
+          indented ? "ml-4 w-[calc(100%-1rem)]" : ""
+        } ${sel ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
+      >
+        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition ${sel ? "bg-blue-600 border-blue-600" : "border-slate-300"}`}>
+          {sel && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-800 truncate">{account.descriptiveName}</p>
+          <p className="text-xs text-slate-400">ID: {account.customerId} · {account.googleEmail}</p>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {standaloneAccounts.map((account) => (
+        <AccountRow key={account.customerId} account={account} />
+      ))}
+      {mccAccounts.map((mcc) => {
+        const children = accounts.filter((a) => a.mccId === mcc.customerId);
+        return (
+          <div key={mcc.customerId} className="space-y-1.5">
+            <div className="flex items-center gap-2 px-2 pt-1">
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">MCC</span>
+              <p className="text-xs font-semibold text-slate-600 truncate">{mcc.descriptiveName}</p>
+              <span className="text-xs text-slate-400">· ID: {mcc.customerId}</span>
+            </div>
+            {children.length === 0 ? (
+              <p className="ml-4 text-xs text-slate-400 py-2">Nenhuma subconta encontrada neste MCC.</p>
+            ) : (
+              children.map((child) => (
+                <AccountRow key={child.customerId} account={child} indented />
+              ))
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
