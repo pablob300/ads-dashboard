@@ -30,10 +30,10 @@ export default function FunnelMetrics({ totals }: { totals: Totals }) {
         <ResponsiveContainer width="100%" height="100%">
           <FunnelChart>
             <Tooltip
-              formatter={(value: number, name: string) => [
-                `${fmtNum(value)} (${((value / top) * 100).toFixed(1)}%)`,
-                name,
-              ]}
+              formatter={(value, name) => {
+                const v = Number(value ?? 0);
+                return [`${fmtNum(v)} (${((v / top) * 100).toFixed(1)}%)`, String(name)];
+              }}
             />
             <Funnel dataKey="value" data={data} isAnimationActive lastShapeType="rectangle">
               <LabelList
