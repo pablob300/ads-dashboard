@@ -88,6 +88,7 @@ export async function fetchCampaignData(
        FROM campaign
        WHERE segments.date BETWEEN '${start}' AND '${end}'
          AND metrics.impressions > 0
+         AND metrics.cost_micros > 0
        ORDER BY metrics.cost_micros DESC`
     ),
     gaqlQuery(
@@ -103,27 +104,32 @@ export async function fetchCampaignData(
   ]);
 
   // Agrega campanhas (pode haver múltiplas linhas por campanha)
+  // Number() é obrigatório: a API retorna impressions/clicks como strings no JSON
   const campaignMap = new Map<string, CampaignMetric>();
   for (const row of campaignRows) {
     const c = row.campaign as { id: string; name: string };
     const m = row.metrics as {
-      impressions: number; clicks: number;
-      costMicros: number; conversions: number;
+      impressions: unknown; clicks: unknown;
+      costMicros: unknown; conversions: unknown;
     };
+    const impressions  = Number(m.impressions  ?? 0);
+    const clicks       = Number(m.clicks       ?? 0);
+    const costBRL      = microsToBRL(Number(m.costMicros ?? 0));
+    const conversions  = Number(m.conversions  ?? 0);
     const existing = campaignMap.get(c.id);
     if (existing) {
-      existing.impressions += m.impressions;
-      existing.clicks += m.clicks;
-      existing.costBRL += microsToBRL(m.costMicros ?? 0);
-      existing.conversions += m.conversions;
+      existing.impressions += impressions;
+      existing.clicks      += clicks;
+      existing.costBRL     += costBRL;
+      existing.conversions += conversions;
     } else {
       campaignMap.set(c.id, {
         id: c.id,
         name: c.name,
-        impressions: m.impressions,
-        clicks: m.clicks,
-        costBRL: microsToBRL(m.costMicros ?? 0),
-        conversions: m.conversions,
+        impressions,
+        clicks,
+        costBRL,
+        conversions,
         ctr: 0,
         costPerConversion: 0,
       });
@@ -136,28 +142,26 @@ export async function fetchCampaignData(
     costPerConversion: c.conversions > 0 ? c.costBRL / c.conversions : 0,
   }));
 
-  // Agrega métricas diárias
+  // Agrega métricas diárias — mesmo cuidado com strings da API
   const dailyMap = new Map<string, DailyMetric>();
   for (const row of dailyRows) {
     const date = (row.segments as { date: string }).date;
     const m = row.metrics as {
-      impressions: number; clicks: number;
-      costMicros: number; conversions: number;
+      impressions: unknown; clicks: unknown;
+      costMicros: unknown; conversions: unknown;
     };
+    const impressions  = Number(m.impressions  ?? 0);
+    const clicks       = Number(m.clicks       ?? 0);
+    const costBRL      = microsToBRL(Number(m.costMicros ?? 0));
+    const conversions  = Number(m.conversions  ?? 0);
     const existing = dailyMap.get(date);
     if (existing) {
-      existing.impressions += m.impressions;
-      existing.clicks += m.clicks;
-      existing.costBRL += microsToBRL(m.costMicros ?? 0);
-      existing.conversions += m.conversions;
+      existing.impressions += impressions;
+      existing.clicks      += clicks;
+      existing.costBRL     += costBRL;
+      existing.conversions += conversions;
     } else {
-      dailyMap.set(date, {
-        date,
-        impressions: m.impressions,
-        clicks: m.clicks,
-        costBRL: microsToBRL(m.costMicros ?? 0),
-        conversions: m.conversions,
-      });
+      dailyMap.set(date, { date, impressions, clicks, costBRL, conversions });
     }
   }
 
