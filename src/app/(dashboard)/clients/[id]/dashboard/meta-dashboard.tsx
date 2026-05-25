@@ -8,6 +8,11 @@ import {
 } from "recharts";
 import type { MetaCampaignData, MetaCampaignMetric } from "@/lib/meta-ads-campaigns";
 import { useToast } from "@/components/toast";
+import MonthYearPicker from "@/components/sub-reports/MonthYearPicker";
+import SubReportChips from "@/components/sub-reports/SubReportChips";
+import FunnelMetrics from "@/components/sub-reports/FunnelMetrics";
+import CreateSubReportModal, { type SubReport } from "@/components/sub-reports/CreateSubReportModal";
+import EditSubReportModal from "@/components/sub-reports/EditSubReportModal";
 
 interface MetaAccount {
   id: string;
@@ -43,6 +48,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
   const init = useMemo(() => defaultRange(), []);
   const [startDate, setStartDate] = useState(init.start);
   const [endDate, setEndDate] = useState(init.end);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [data, setData] = useState<MetaCampaignData | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -54,6 +60,21 @@ export default function MetaDashboard({ client }: { client: Client }) {
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  // Sub-relatórios
+  const [subReports, setSubReports] = useState<SubReport[]>([]);
+  const [activeSubReport, setActiveSubReport] = useState<SubReport | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingSubReport, setEditingSubReport] = useState<SubReport | null>(null);
+  const [pendingCampaigns, setPendingCampaigns] = useState<{ id: string; name: string }[]>([]);
+
+  // Carrega sub-relatórios ao montar
+  useEffect(() => {
+    fetch(`/api/clients/${client.id}/sub-reports?channel=meta`)
+      .then((r) => r.json())
+      .then((d) => setSubReports(d.subReports ?? []))
+      .catch(() => {});
+  }, [client.id]);
+
   const fetchData = useCallback(async (start: string, end: string) => {
     if (!start || !end || start > end) return;
     setLoading(true);
@@ -62,6 +83,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
       const json: MetaCampaignData = await res.json();
       setData(json);
       setSelectedCampaigns(new Set(json.campaigns.map((c) => c.id)));
+      setActiveSubReport(null);
     } catch {
       setData(null);
       addToast("Erro ao carregar dados Meta Ads.", "error");
@@ -71,6 +93,14 @@ export default function MetaDashboard({ client }: { client: Client }) {
   }, [client.id, addToast]);
 
   useEffect(() => { fetchData(startDate, endDate); }, [startDate, endDate, fetchData]);
+
+  function handleMonthChange(months: string[], range: { start: string; end: string } | null) {
+    setSelectedMonths(months);
+    if (range) {
+      setStartDate(range.start);
+      setEndDate(range.end);
+    }
+  }
 
   const filteredCampaigns = useMemo(() => {
     if (!data) return [];
@@ -123,6 +153,52 @@ export default function MetaDashboard({ client }: { client: Client }) {
     );
   }
 
+  // Sub-relatórios
+  function handleSelectSubReport(sr: SubReport | null) {
+    setActiveSubReport(sr);
+    if (sr) {
+      setSelectedCampaigns(new Set(sr.campaignIds));
+    } else {
+      setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
+    }
+  }
+
+  function handleGerarRelatorio() {
+    if (!data) return;
+    const campaigns = data.campaigns.filter((c) => selectedCampaigns.has(c.id));
+    setPendingCampaigns(campaigns.map((c) => ({ id: c.id, name: c.name })));
+    setDropdownOpen(false);
+    setShowCreateModal(true);
+  }
+
+  function handleSubReportCreated(sr: SubReport) {
+    setSubReports((prev) => [...prev, sr]);
+    setActiveSubReport(sr);
+    setSelectedCampaigns(new Set(sr.campaignIds));
+    setShowCreateModal(false);
+    addToast(`Sub-relatório "${sr.name}" criado!`, "success");
+  }
+
+  function handleSubReportUpdated(sr: SubReport) {
+    setSubReports((prev) => prev.map((r) => (r.id === sr.id ? sr : r)));
+    if (activeSubReport?.id === sr.id) {
+      setActiveSubReport(sr);
+      setSelectedCampaigns(new Set(sr.campaignIds));
+    }
+    setEditingSubReport(null);
+    addToast(`Sub-relatório "${sr.name}" atualizado!`, "success");
+  }
+
+  function handleSubReportDeleted(id: string) {
+    setSubReports((prev) => prev.filter((r) => r.id !== id));
+    if (activeSubReport?.id === id) {
+      setActiveSubReport(null);
+      setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
+    }
+    setEditingSubReport(null);
+    addToast("Sub-relatório excluído.", "success");
+  }
+
   // Sem contas Meta vinculadas
   if (client.metaAdAccounts.length === 0) {
     return (
@@ -149,189 +225,250 @@ export default function MetaDashboard({ client }: { client: Client }) {
   }
 
   return (
-    <div className="space-y-5">
-      {/* Badge demo + filtros */}
-      <div className="flex flex-wrap items-center gap-3">
-        {data?.isSampleData && (
-          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-medium">
-            Dados de demonstração
-          </span>
-        )}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs text-slate-500 shrink-0">De</label>
-            <input type="date" value={startDate} max={endDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="h-9 px-3 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs text-slate-500 shrink-0">até</label>
-            <input type="date" value={endDate} min={startDate} max={toInputDate(new Date())}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="h-9 px-3 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-            />
-          </div>
+    <>
+      <div className="space-y-5">
+        {/* Seletor de mês */}
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5">
+          <MonthYearPicker selected={selectedMonths} onChange={handleMonthChange} />
         </div>
 
-        {/* Multiselect campanhas */}
-        <div className="relative">
-          <button onClick={() => setDropdownOpen((o) => !o)}
-            className="h-9 flex items-center gap-2 pl-3 pr-3 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white hover:border-slate-400 transition min-w-[220px]"
-          >
-            <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
-            </svg>
-            <span className="flex-1 text-left text-slate-600 truncate">
-              {selectedCampaigns.size === 0 ? "Nenhuma campanha"
-                : selectedCampaigns.size === data?.campaigns.length ? "Todas as campanhas"
-                : `${selectedCampaigns.size} campanha${selectedCampaigns.size > 1 ? "s" : ""}`}
+        {/* Sub-relatórios + filtros */}
+        <div className="flex flex-wrap items-center gap-3">
+          {data?.isSampleData && (
+            <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-medium">
+              Dados de demonstração
             </span>
-            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {dropdownOpen && (
-            <div className="absolute top-10 left-0 z-50 w-80 bg-white border border-slate-200 rounded-xl shadow-xl">
-              <div className="p-2 border-b border-slate-100">
-                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar campanha..." autoFocus
-                  className="w-full px-3 py-2 text-sm text-[#333333] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="p-2 border-b border-slate-100">
-                <button onClick={toggleAll} className="w-full text-left px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                  {selectedCampaigns.size === filteredCampaigns.length ? "Desmarcar todas" : "Selecionar todas"}
-                </button>
-              </div>
-              <div className="max-h-56 overflow-y-auto p-2 space-y-0.5">
-                {loading ? <p className="text-xs text-slate-400 px-2 py-3 text-center">Carregando...</p>
-                  : filteredCampaigns.length === 0 ? <p className="text-xs text-slate-400 px-2 py-3 text-center">Nenhuma encontrada</p>
-                  : filteredCampaigns.map((c) => (
-                    <button key={c.id} onClick={() => toggleCampaign(c.id)}
-                      className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-slate-50 transition text-left"
-                    >
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${selectedCampaigns.has(c.id) ? "bg-blue-600 border-blue-600" : "border-slate-300"}`}>
-                        {selectedCampaigns.has(c.id) && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </div>
-                      <span className="text-xs text-slate-700 truncate">{c.name}</span>
-                    </button>
-                  ))}
-              </div>
-              <div className="p-2 border-t border-slate-100">
-                <button onClick={() => setDropdownOpen(false)} className="w-full text-center text-xs text-slate-500 hover:text-slate-700 py-1 transition">Fechar</button>
-              </div>
-            </div>
           )}
-        </div>
-      </div>
 
-      {loading ? (
-        <div className="space-y-4 animate-pulse">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[...Array(6)].map((_, i) => <div key={i} className="h-20 bg-slate-100 rounded-xl" />)}
+          {/* Datas */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-slate-500 shrink-0">De</label>
+              <input type="date" value={startDate} max={endDate}
+                onChange={(e) => { setStartDate(e.target.value); setSelectedMonths([]); }}
+                className="h-9 px-3 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-slate-500 shrink-0">até</label>
+              <input type="date" value={endDate} min={startDate} max={toInputDate(new Date())}
+                onChange={(e) => { setEndDate(e.target.value); setSelectedMonths([]); }}
+                className="h-9 px-3 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
           </div>
-          <div className="h-72 bg-slate-100 rounded-xl" />
-        </div>
-      ) : (
-        <>
-          {/* KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              { label: "Valor Gasto",  value: fmtBRL(totals.spend),         color: "text-[#1877F2]" },
-              { label: "Conversões",   value: fmtNum(totals.conversions),    color: "text-emerald-600" },
-              { label: "Cliques",      value: fmtNum(totals.clicks),         color: "text-amber-600" },
-              { label: "Impressões",   value: fmtNum(totals.impressions),    color: "text-purple-600" },
-              { label: "CTR",          value: fmtPct(totals.ctr),            color: "text-slate-700" },
-              { label: "CPC Médio",    value: fmtBRL(totals.cpc),            color: "text-slate-700" },
-            ].map((kpi) => (
-              <div key={kpi.label} className="bg-white border border-slate-200 rounded-xl px-4 py-3">
-                <p className="text-xs text-slate-500 mb-1">{kpi.label}</p>
-                <p className={`text-lg font-bold ${kpi.color}`}>{kpi.value}</p>
+
+          {/* Sub-relatório chips */}
+          <SubReportChips
+            subReports={subReports}
+            activeId={activeSubReport?.id ?? null}
+            onSelect={handleSelectSubReport}
+            onEdit={(sr) => setEditingSubReport(sr)}
+          />
+
+          {/* Dropdown de campanhas */}
+          <div className="relative">
+            <button onClick={() => setDropdownOpen((o) => !o)}
+              className="h-9 flex items-center gap-2 pl-3 pr-3 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white hover:border-slate-400 transition min-w-[220px]"
+            >
+              <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+              </svg>
+              <span className="flex-1 text-left text-slate-600 truncate">
+                {selectedCampaigns.size === 0 ? "Nenhuma campanha"
+                  : selectedCampaigns.size === data?.campaigns.length ? "Todas as campanhas"
+                  : `${selectedCampaigns.size} campanha${selectedCampaigns.size > 1 ? "s" : ""}`}
+              </span>
+              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {dropdownOpen && (
+              <div className="absolute top-10 left-0 z-50 w-80 bg-white border border-slate-200 rounded-xl shadow-xl">
+                <div className="p-2 border-b border-slate-100">
+                  <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar campanha..." autoFocus
+                    className="w-full px-3 py-2 text-sm text-[#333333] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="p-2 border-b border-slate-100">
+                  <button onClick={toggleAll} className="w-full text-left px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                    {selectedCampaigns.size === filteredCampaigns.length ? "Desmarcar todas" : "Selecionar todas"}
+                  </button>
+                </div>
+                <div className="max-h-56 overflow-y-auto p-2 space-y-0.5">
+                  {loading ? <p className="text-xs text-slate-400 px-2 py-3 text-center">Carregando...</p>
+                    : filteredCampaigns.length === 0 ? <p className="text-xs text-slate-400 px-2 py-3 text-center">Nenhuma encontrada</p>
+                    : filteredCampaigns.map((c) => (
+                      <button key={c.id} onClick={() => toggleCampaign(c.id)}
+                        className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-slate-50 transition text-left"
+                      >
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${selectedCampaigns.has(c.id) ? "bg-blue-600 border-blue-600" : "border-slate-300"}`}>
+                          {selectedCampaigns.has(c.id) && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                        </div>
+                        <span className="text-xs text-slate-700 truncate">{c.name}</span>
+                      </button>
+                    ))}
+                </div>
+                <div className="p-2 border-t border-slate-100 flex gap-2">
+                  <button onClick={() => setDropdownOpen(false)}
+                    className="flex-1 text-center text-xs text-slate-500 hover:text-slate-700 py-2 border border-slate-200 rounded-lg transition"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    onClick={handleGerarRelatorio}
+                    disabled={selectedCampaigns.size === 0}
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition"
+                  >
+                    Gerar Relatório
+                  </button>
+                </div>
               </div>
-            ))}
+            )}
           </div>
+        </div>
 
-          {/* Gráfico */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
-            <div className="flex flex-wrap items-center gap-2 mb-5">
-              {METRICS.map((m) => (
-                <button key={m.key} onClick={() => toggleMetric(m.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${visibleMetrics.has(m.key) ? "text-white border-transparent" : "bg-white text-slate-400 border-slate-200"}`}
-                  style={visibleMetrics.has(m.key) ? { background: m.color, borderColor: m.color } : {}}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ background: visibleMetrics.has(m.key) ? "white" : m.color }} />
-                  {m.label}
-                </button>
+        {loading ? (
+          <div className="space-y-4 animate-pulse">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[...Array(6)].map((_, i) => <div key={i} className="h-20 bg-slate-100 rounded-xl" />)}
+            </div>
+            <div className="h-72 bg-slate-100 rounded-xl" />
+          </div>
+        ) : (
+          <>
+            {/* KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { label: "Valor Gasto",  value: fmtBRL(totals.spend),         color: "text-[#1877F2]" },
+                { label: "Conversões",   value: fmtNum(totals.conversions),    color: "text-emerald-600" },
+                { label: "Cliques",      value: fmtNum(totals.clicks),         color: "text-amber-600" },
+                { label: "Impressões",   value: fmtNum(totals.impressions),    color: "text-purple-600" },
+                { label: "CTR",          value: fmtPct(totals.ctr),            color: "text-slate-700" },
+                { label: "CPC Médio",    value: fmtBRL(totals.cpc),            color: "text-slate-700" },
+              ].map((kpi) => (
+                <div key={kpi.label} className="bg-white border border-slate-200 rounded-xl px-4 py-3">
+                  <p className="text-xs text-slate-500 mb-1">{kpi.label}</p>
+                  <p className={`text-lg font-bold ${kpi.color}`}>{kpi.value}</p>
+                </div>
               ))}
             </div>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="date" tickFormatter={(v) => v.split("-")[2]} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="money"  orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} width={52} />
-                <YAxis yAxisId="volume" orientation="left"  tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} width={44} />
-                <YAxis yAxisId="small" hide />
-                <Tooltip content={<CustomTooltip />} />
-                {METRICS.map((m) => visibleMetrics.has(m.key) ? (
-                  <Line key={m.key} yAxisId={m.yAxisId} type="monotone" dataKey={m.key} name={m.label}
-                    stroke={m.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-                ) : null)}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
 
-          {/* Tabela */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-800 text-sm">
-                Campanhas com impressões no período
-                <span className="ml-2 text-slate-400 font-normal">({tableCampaigns.length})</span>
-              </h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    {["Campanha", "Valor Investido", "Impressões", "Cliques", "Conversões", "CTR", "Custo/Conv."].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {tableCampaigns.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">Nenhuma campanha selecionada</td></tr>
-                  ) : tableCampaigns.map((c: MetaCampaignMetric) => (
-                    <tr key={c.id} className="hover:bg-slate-50 transition">
-                      <td className="px-4 py-3 font-medium text-slate-800 max-w-[220px] truncate">{c.name}</td>
-                      <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtBRL(c.spend)}</td>
-                      <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.impressions)}</td>
-                      <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.clicks)}</td>
-                      <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.conversions)}</td>
-                      <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtPct(c.ctr)}</td>
-                      <td className="px-4 py-3 text-slate-700 tabular-nums">{c.conversions > 0 ? fmtBRL(c.costPerConversion) : "—"}</td>
-                    </tr>
+            {/* Gráfico linha + Funil — 70/30 no desktop */}
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Gráfico principal — 70% */}
+              <div className="lg:w-[70%] bg-white border border-slate-200 rounded-xl p-5">
+                <div className="flex flex-wrap items-center gap-2 mb-5">
+                  {METRICS.map((m) => (
+                    <button key={m.key} onClick={() => toggleMetric(m.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${visibleMetrics.has(m.key) ? "text-white border-transparent" : "bg-white text-slate-400 border-slate-200"}`}
+                      style={visibleMetrics.has(m.key) ? { background: m.color, borderColor: m.color } : {}}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ background: visibleMetrics.has(m.key) ? "white" : m.color }} />
+                      {m.label}
+                    </button>
                   ))}
-                </tbody>
-                {tableCampaigns.length > 0 && (
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-200 bg-slate-50">
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-600">TOTAL</td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtBRL(totals.spend)}</td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.impressions)}</td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.clicks)}</td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.conversions)}</td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtPct(totals.ctr)}</td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{totals.conversions > 0 ? fmtBRL(totals.spend / totals.conversions) : "—"}</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
+                </div>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="date" tickFormatter={(v) => v.split("-")[2]} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                    <YAxis yAxisId="money"  orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} width={52} />
+                    <YAxis yAxisId="volume" orientation="left"  tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} width={44} />
+                    <YAxis yAxisId="small" hide />
+                    <Tooltip content={<CustomTooltip />} />
+                    {METRICS.map((m) => visibleMetrics.has(m.key) ? (
+                      <Line key={m.key} yAxisId={m.yAxisId} type="monotone" dataKey={m.key} name={m.label}
+                        stroke={m.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                    ) : null)}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Funil — 30% */}
+              <div className="lg:w-[30%] bg-white border border-slate-200 rounded-xl p-5">
+                <FunnelMetrics totals={totals} />
+              </div>
             </div>
-          </div>
-        </>
+
+            {/* Tabela */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <h2 className="font-semibold text-slate-800 text-sm">
+                  Campanhas com impressões no período
+                  <span className="ml-2 text-slate-400 font-normal">({tableCampaigns.length})</span>
+                </h2>
+                {activeSubReport && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                    {activeSubReport.name}
+                  </span>
+                )}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      {["Campanha", "Valor Investido", "Impressões", "Cliques", "Conversões", "CTR", "Custo/Conv."].map((h) => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {tableCampaigns.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">Nenhuma campanha selecionada</td></tr>
+                    ) : tableCampaigns.map((c: MetaCampaignMetric) => (
+                      <tr key={c.id} className="hover:bg-slate-50 transition">
+                        <td className="px-4 py-3 font-medium text-slate-800 max-w-[220px] truncate">{c.name}</td>
+                        <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtBRL(c.spend)}</td>
+                        <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.impressions)}</td>
+                        <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.clicks)}</td>
+                        <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.conversions)}</td>
+                        <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtPct(c.ctr)}</td>
+                        <td className="px-4 py-3 text-slate-700 tabular-nums">{c.conversions > 0 ? fmtBRL(c.costPerConversion) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {tableCampaigns.length > 0 && (
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50">
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-600">TOTAL</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtBRL(totals.spend)}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.impressions)}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.clicks)}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.conversions)}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtPct(totals.ctr)}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{totals.conversions > 0 ? fmtBRL(totals.spend / totals.conversions) : "—"}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Modais */}
+      {showCreateModal && (
+        <CreateSubReportModal
+          clientId={client.id}
+          channel="meta"
+          campaigns={pendingCampaigns}
+          onCreated={handleSubReportCreated}
+          onCancel={() => setShowCreateModal(false)}
+        />
       )}
-    </div>
+      {editingSubReport && (
+        <EditSubReportModal
+          clientId={client.id}
+          subReport={editingSubReport}
+          onUpdated={handleSubReportUpdated}
+          onDeleted={handleSubReportDeleted}
+          onCancel={() => setEditingSubReport(null)}
+        />
+      )}
+    </>
   );
 }
 

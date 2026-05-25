@@ -72,8 +72,23 @@ model Client {
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   googleAdAccounts GoogleAdAccount[]
   metaAdAccounts   MetaAdAccount[]
+  subReports       SubReport[]
 
   @@map("clients")
+}
+
+model SubReport {
+  id          String   @id @default(cuid())
+  clientId    String
+  channel     String   // "google" | "meta" | extensível
+  name        String
+  campaignIds String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("sub_reports")
 }
 
 model GoogleAdAccount {
