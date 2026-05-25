@@ -248,12 +248,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
 
       {activeTab === "google" && <>
 
-        {/* Seletor de mês */}
-        <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5">
-          <MonthYearPicker selected={selectedMonths} onChange={handleMonthChange} />
-        </div>
-
-        {/* Sub-relatórios + filtros */}
+        {/* Filtros */}
         <div className="flex flex-wrap items-center gap-3">
           {data?.isSampleData && (
             <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-medium">
@@ -261,7 +256,10 @@ export default function ClientDashboard({ client }: { client: Client }) {
             </span>
           )}
 
-          {/* Datas */}
+          {/* Seletor de período por mês */}
+          <MonthYearPicker selected={selectedMonths} onChange={handleMonthChange} />
+
+          {/* Datas manuais */}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
               <label className="text-xs text-slate-500 shrink-0">De</label>
