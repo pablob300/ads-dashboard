@@ -9,6 +9,7 @@ import {
 import type { CampaignData, CampaignMetric } from "@/lib/google-ads-campaigns";
 import { useToast } from "@/components/toast";
 import MetaDashboard from "./meta-dashboard";
+import ShareModal from "@/components/ShareModal";
 import MonthYearPicker from "@/components/sub-reports/MonthYearPicker";
 import SubReportChips from "@/components/sub-reports/SubReportChips";
 import FunnelMetrics from "@/components/sub-reports/FunnelMetrics";
@@ -69,6 +70,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSubReport, setEditingSubReport] = useState<SubReport | null>(null);
   const [pendingCampaigns, setPendingCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Carrega sub-relatórios ao montar
   useEffect(() => {
@@ -224,6 +226,15 @@ export default function ClientDashboard({ client }: { client: Client }) {
             {client.metaAdAccounts.length > 0 && ` · ${client.metaAdAccounts.length} conta${client.metaAdAccounts.length !== 1 ? "s" : ""} Meta`}
           </p>
         </div>
+        <button
+          onClick={() => setShowShareModal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:border-blue-400 hover:text-blue-600 bg-white transition"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          Compartilhar
+        </button>
       </div>
 
       {/* Abas */}
@@ -482,6 +493,11 @@ export default function ClientDashboard({ client }: { client: Client }) {
           </>
         )}
       </>}
+
+      {/* Modal de compartilhamento */}
+      {showShareModal && (
+        <ShareModal clientId={client.id} onClose={() => setShowShareModal(false)} />
+      )}
 
       {/* Modais */}
       {showCreateModal && (

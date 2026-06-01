@@ -73,8 +73,22 @@ model Client {
   googleAdAccounts GoogleAdAccount[]
   metaAdAccounts   MetaAdAccount[]
   subReports       SubReport[]
+  shareLinks       ShareLink[]
 
   @@map("clients")
+}
+
+model ShareLink {
+  id        String    @id @default(cuid())
+  clientId  String
+  token     String    @unique
+  label     String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("share_links")
 }
 
 model SubReport {
