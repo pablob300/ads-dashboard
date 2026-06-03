@@ -41,7 +41,7 @@ npx prisma migrate dev --name <nome>
 npx prisma generate
 
 # Build (verificar antes de cada fase)
-npm run build
+npm run build   # apenas next build — sem prisma migrate deploy
 ```
 
 PostgreSQL service: `sc.exe query "postgresql-x64-16"`
@@ -124,8 +124,12 @@ Erros da API são propagados e exibidos via toast no dashboard.
 
 - `users` — usuários do sistema
 - `google_connections` — tokens OAuth por usuário (access + refresh + expiry)
+- `meta_connections` — tokens OAuth Meta por usuário
 - `clients` — clientes gerenciados
 - `google_ad_accounts` — contas Google Ads por cliente (campo `alias` para renomear)
+- `meta_ad_accounts` — contas Meta Ads por cliente
+- `sub_reports` — relatórios filtrados por canal e campanhas
+- `share_links` — links públicos de compartilhamento de dashboard
 
 ---
 
@@ -133,11 +137,13 @@ Erros da API são propagados e exibidos via toast no dashboard.
 
 1. **`proxy.ts`** — Next.js 16 deprecou `middleware.ts`. Renomear para `proxy.ts`.
 2. **Prisma 7** — `url` sai do `schema.prisma` e vai para `prisma.config.ts`. Precisa de `@prisma/adapter-pg`.
-3. **`params` como Promise** — em route handlers e pages do Next.js 16, sempre `await params`.
-4. **Zod v4** — `err.errors[0]` virou `err.issues[0]`.
-5. **Google Ads API versão** — verificar versão ativa. Em mai/2026 é v20. Script de detecção em `docs/PROJECT.md`.
-6. **Token expirado** — `getValidAccessToken()` renova automaticamente se expirar em < 5 min.
-7. **Texto inputs** — Tailwind v4 + globals.css: `input, textarea, select { color: #333333 }`.
+3. **Prisma 7 migrations** — `directUrl` NÃO é suportado em lugar nenhum (nem `schema.prisma` nem `prisma.config.ts`). Migrations são aplicadas manualmente via Supabase SQL Editor antes de cada deploy.
+4. **`params` como Promise** — em route handlers e pages do Next.js 16, sempre `await params`.
+5. **Zod v4** — `err.errors[0]` virou `err.issues[0]`.
+6. **Google Ads API versão** — verificar versão ativa. Em mai/2026 é v20. Script de detecção em `docs/PROJECT.md`.
+7. **Token expirado** — `getValidAccessToken()` renova automaticamente se expirar em < 5 min.
+8. **Texto inputs** — Tailwind v4 + globals.css: `input, textarea, select { color: #333333 }`.
+9. **Supabase pooler porta 6543** — modo transaction, não suporta DDL. Nunca usar como DATABASE_URL para migrations.
 
 ---
 
