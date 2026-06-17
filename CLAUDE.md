@@ -109,7 +109,7 @@ src/
 
 | Item | Valor |
 |---|---|
-| Versão API | **v20** (v18 e v19 já sunset em mai/2026) |
+| Versão API | **v21** (v20 foi sunset em jun/2026) |
 | Developer Token | **Basic Access aprovado** — acessa contas reais |
 | Basic Access | **✅ Aprovado** |
 | OAuth Callback | `http://localhost:3000/api/google-ads/callback` |

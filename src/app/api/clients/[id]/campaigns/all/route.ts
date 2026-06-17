@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getValidAccessToken } from "@/lib/google-ads";
 import { NextRequest, NextResponse } from "next/server";
 
-const GOOGLE_ADS_API_VERSION = "v20";
+const GOOGLE_ADS_API_VERSION = "v21";
 const BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
 
 export interface CampaignListItem {
