@@ -545,6 +545,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
           clientId={client.id}
           subReport={editingSubReport}
           channel="google"
+          knownCampaigns={data?.campaigns}
           onUpdated={handleSubReportUpdated}
           onDeleted={handleSubReportDeleted}
           onCancel={() => setEditingSubReport(null)}

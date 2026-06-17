@@ -491,6 +491,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
           clientId={client.id}
           subReport={editingSubReport}
           channel="meta"
+          knownCampaigns={data?.campaigns}
           onUpdated={handleSubReportUpdated}
           onDeleted={handleSubReportDeleted}
           onCancel={() => setEditingSubReport(null)}

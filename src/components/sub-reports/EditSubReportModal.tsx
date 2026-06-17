@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SubReport } from "./CreateSubReportModal";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 
@@ -14,12 +14,13 @@ interface Props {
   clientId: string;
   subReport: SubReport;
   channel: "google" | "meta";
+  knownCampaigns?: { id: string; name: string }[];
   onUpdated: (subReport: SubReport) => void;
   onDeleted: (id: string) => void;
   onCancel: () => void;
 }
 
-export default function EditSubReportModal({ clientId, subReport, channel, onUpdated, onDeleted, onCancel }: Props) {
+export default function EditSubReportModal({ clientId, subReport, channel, knownCampaigns, onUpdated, onDeleted, onCancel }: Props) {
   const [name, setName] = useState(subReport.name);
   const [allCampaigns, setAllCampaigns] = useState<CampaignListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(subReport.campaignIds));
@@ -41,6 +42,19 @@ export default function EditSubReportModal({ clientId, subReport, channel, onUpd
       .finally(() => setLoadingCampaigns(false));
   }, [clientId, channel]);
 
+  // Mescla: allCampaigns tem prioridade (status correto), knownCampaigns é fallback para IDs
+  // cujo nome não chegou (API falhou ou token expirado)
+  const mergedCampaigns = useMemo(() => {
+    const map = new Map<string, CampaignListItem>();
+    for (const c of knownCampaigns ?? []) {
+      map.set(c.id, { id: c.id, name: c.name, status: "UNKNOWN" });
+    }
+    for (const c of allCampaigns) {
+      map.set(c.id, c);
+    }
+    return Array.from(map.values());
+  }, [allCampaigns, knownCampaigns]);
+
   function toggle(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -49,11 +63,20 @@ export default function EditSubReportModal({ clientId, subReport, channel, onUpd
     });
   }
 
-  const filtered = allCampaigns.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+  const q = search.toLowerCase();
+
+  // Campanhas já selecionadas — aparecem independente do status
+  const selectedInList = mergedCampaigns.filter(
+    (c) => selectedIds.has(c.id) && c.name.toLowerCase().includes(q)
   );
-  const enabled  = filtered.filter((c) => c.status === "ENABLED" || c.status === "ACTIVE");
-  const paused   = filtered.filter((c) => c.status === "PAUSED");
+
+  // Campanhas disponíveis para adicionar — somente ativas e não selecionadas
+  const addable = mergedCampaigns.filter(
+    (c) =>
+      !selectedIds.has(c.id) &&
+      (c.status === "ENABLED" || c.status === "ACTIVE") &&
+      c.name.toLowerCase().includes(q)
+  );
 
   async function handleSave() {
     if (!name.trim()) { setError("Informe um nome."); return; }
@@ -133,27 +156,31 @@ export default function EditSubReportModal({ clientId, subReport, channel, onUpd
                 </div>
               ) : (
                 <div className="border border-slate-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                  {enabled.length > 0 && (
+                  {/* Campanhas já selecionadas — sempre aparecem */}
+                  {selectedInList.length > 0 && (
                     <>
                       <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ativas</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Selecionadas</p>
                       </div>
-                      {enabled.map((c) => (
-                        <CampaignRow key={c.id} campaign={c} selected={selectedIds.has(c.id)} onToggle={toggle} />
+                      {selectedInList.map((c) => (
+                        <CampaignRow key={c.id} campaign={c} selected={true} onToggle={toggle} />
                       ))}
                     </>
                   )}
-                  {paused.length > 0 && (
+
+                  {/* Campanhas ativas disponíveis para adicionar */}
+                  {addable.length > 0 && (
                     <>
-                      <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 border-t border-slate-100">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Pausadas</p>
+                      <div className={`px-3 py-1.5 bg-slate-50 border-b border-slate-100 ${selectedInList.length > 0 ? "border-t border-slate-100" : ""}`}>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Disponíveis</p>
                       </div>
-                      {paused.map((c) => (
-                        <CampaignRow key={c.id} campaign={c} selected={selectedIds.has(c.id)} onToggle={toggle} />
+                      {addable.map((c) => (
+                        <CampaignRow key={c.id} campaign={c} selected={false} onToggle={toggle} />
                       ))}
                     </>
                   )}
-                  {enabled.length === 0 && paused.length === 0 && (
+
+                  {selectedInList.length === 0 && addable.length === 0 && (
                     <p className="text-sm text-slate-400 text-center py-4">Nenhuma campanha encontrada.</p>
                   )}
                 </div>
