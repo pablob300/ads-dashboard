@@ -21,6 +21,7 @@ export interface CampaignMetric {
 }
 
 export interface DailyMetric {
+  campaignId: string;
   date: string;
   impressions: number;
   clicks: number;
@@ -97,7 +98,7 @@ export async function fetchCampaignData(
     gaqlQuery(
       customerId,
       accessToken,
-      `SELECT segments.date,
+      `SELECT campaign.id, segments.date,
               metrics.impressions, metrics.clicks,
               metrics.cost_micros, metrics.conversions
        FROM campaign
@@ -145,9 +146,10 @@ export async function fetchCampaignData(
     costPerConversion: c.conversions > 0 ? c.costBRL / c.conversions : 0,
   }));
 
-  // Agrega métricas diárias — mesmo cuidado com strings da API
+  // Métricas diárias por campanha — chave campaignId:date para evitar duplicatas entre contas
   const dailyMap = new Map<string, DailyMetric>();
   for (const row of dailyRows) {
+    const campaignId = (row.campaign as { id: string }).id;
     const date = (row.segments as { date: string }).date;
     const m = row.metrics as {
       impressions: unknown; clicks: unknown;
@@ -157,14 +159,15 @@ export async function fetchCampaignData(
     const clicks       = Number(m.clicks       ?? 0);
     const costBRL      = microsToBRL(Number(m.costMicros ?? 0));
     const conversions  = Number(m.conversions  ?? 0);
-    const existing = dailyMap.get(date);
+    const key = `${campaignId}:${date}`;
+    const existing = dailyMap.get(key);
     if (existing) {
       existing.impressions += impressions;
       existing.clicks      += clicks;
       existing.costBRL     += costBRL;
       existing.conversions += conversions;
     } else {
-      dailyMap.set(date, { date, impressions, clicks, costBRL, conversions });
+      dailyMap.set(key, { campaignId, date, impressions, clicks, costBRL, conversions });
     }
   }
 

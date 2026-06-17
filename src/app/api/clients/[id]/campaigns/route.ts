@@ -68,18 +68,19 @@ export async function GET(
   // Agrega campanhas de todas as contas
   const allCampaigns = valid.flatMap((r) => r!.campaigns);
 
-  // Agrega métricas diárias de todas as contas
-  const dailyMap = new Map<string, { impressions: number; clicks: number; costBRL: number; conversions: number }>();
+  // Agrega métricas diárias de todas as contas — chave campaignId:date
+  const dailyMap = new Map<string, { campaignId: string; date: string; impressions: number; clicks: number; costBRL: number; conversions: number }>();
   for (const result of valid) {
     for (const day of result!.dailyMetrics) {
-      const existing = dailyMap.get(day.date);
+      const key = `${day.campaignId}:${day.date}`;
+      const existing = dailyMap.get(key);
       if (existing) {
         existing.impressions += day.impressions;
         existing.clicks += day.clicks;
         existing.costBRL += day.costBRL;
         existing.conversions += day.conversions;
       } else {
-        dailyMap.set(day.date, { ...day });
+        dailyMap.set(key, { ...day });
       }
     }
   }
@@ -87,8 +88,7 @@ export async function GET(
   return NextResponse.json({
     isSampleData: false,
     campaigns: allCampaigns,
-    dailyMetrics: Array.from(dailyMap.entries())
-      .map(([date, m]) => ({ date, ...m }))
+    dailyMetrics: Array.from(dailyMap.values())
       .sort((a, b) => a.date.localeCompare(b.date)),
   });
 }

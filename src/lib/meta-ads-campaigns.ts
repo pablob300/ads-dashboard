@@ -13,6 +13,7 @@ export interface MetaCampaignMetric {
 }
 
 export interface MetaDailyMetric {
+  campaignId: string;
   date: string;        // YYYY-MM-DD
   impressions: number;
   clicks: number;
@@ -51,12 +52,12 @@ export async function fetchMetaCampaignData(
     if (!campaignRes.ok) throw new Error(`Meta API error: ${campaignRes.status}`);
     const campaignData = await campaignRes.json();
 
-    // Métricas diárias
+    // Métricas diárias por campanha
     const dailyRes = await fetch(
       `${META_BASE}/${accountId}/insights?` +
-      `fields=impressions,clicks,spend,actions` +
-      `&time_increment=1&time_range=${encodeURIComponent(timeRange)}` +
-      `&limit=500&access_token=${token}`
+      `fields=campaign_id,impressions,clicks,spend,actions` +
+      `&level=campaign&time_increment=1&time_range=${encodeURIComponent(timeRange)}` +
+      `&limit=1000&access_token=${token}`
     );
 
     if (!dailyRes.ok) throw new Error(`Meta API daily error: ${dailyRes.status}`);
@@ -90,7 +91,8 @@ export async function fetchMetaCampaignData(
     );
 
     const dailyMetrics: MetaDailyMetric[] = (dailyData.data ?? []).map(
-      (d: { date_start: string; impressions: string; clicks: string; spend: string; actions?: { action_type: string; value: string }[] }) => ({
+      (d: { campaign_id: string; date_start: string; impressions: string; clicks: string; spend: string; actions?: { action_type: string; value: string }[] }) => ({
+        campaignId: d.campaign_id,
         date: d.date_start,
         impressions: parseInt(d.impressions || "0"),
         clicks: parseInt(d.clicks || "0"),
@@ -119,14 +121,18 @@ export function generateMetaSampleData(startDate: Date, endDate: Date): MetaCamp
   const days: MetaDailyMetric[] = [];
   const cur = new Date(startDate);
   while (cur <= endDate) {
-    const base = 0.6 + Math.random() * 0.8;
-    days.push({
-      date: cur.toISOString().slice(0, 10),
-      impressions: Math.round(4400 * base),
-      clicks:      Math.round(200 * base),
-      spend:       Math.round(165 * base * 100) / 100,
-      conversions: Math.round(9 * base),
-    });
+    const date = cur.toISOString().slice(0, 10);
+    for (const c of campaigns) {
+      const base = 0.6 + Math.random() * 0.8;
+      days.push({
+        campaignId: c.id,
+        date,
+        impressions: Math.round((c.impressions / 30) * base),
+        clicks:      Math.round((c.clicks / 30) * base),
+        spend:       Math.round((c.spend / 30) * base * 100) / 100,
+        conversions: Math.round((c.conversions / 30) * base),
+      });
+    }
     cur.setDate(cur.getDate() + 1);
   }
 

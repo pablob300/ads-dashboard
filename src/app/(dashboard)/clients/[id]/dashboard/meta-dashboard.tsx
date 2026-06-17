@@ -110,15 +110,19 @@ export default function MetaDashboard({ client }: { client: Client }) {
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    if (selectedCampaigns.size === data.campaigns.length) return data.dailyMetrics;
-    const ratio = selectedCampaigns.size / Math.max(data.campaigns.length, 1);
-    return data.dailyMetrics.map((d) => ({
-      ...d,
-      impressions: Math.round(d.impressions * ratio),
-      clicks:      Math.round(d.clicks * ratio),
-      spend:       Math.round(d.spend * ratio * 100) / 100,
-      conversions: Math.round(d.conversions * ratio),
-    }));
+    const dayMap = new Map<string, { date: string; impressions: number; clicks: number; spend: number; conversions: number }>();
+    for (const d of data.dailyMetrics.filter((d) => selectedCampaigns.has(d.campaignId))) {
+      const existing = dayMap.get(d.date);
+      if (existing) {
+        existing.impressions += d.impressions;
+        existing.clicks      += d.clicks;
+        existing.spend       += d.spend;
+        existing.conversions += d.conversions;
+      } else {
+        dayMap.set(d.date, { date: d.date, impressions: d.impressions, clicks: d.clicks, spend: d.spend, conversions: d.conversions });
+      }
+    }
+    return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [data, selectedCampaigns]);
 
   const totals = useMemo(() => {

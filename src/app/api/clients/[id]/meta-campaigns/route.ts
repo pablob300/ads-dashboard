@@ -56,17 +56,18 @@ export async function GET(
   const isSampleData = valid.every((r) => r!.isSampleData);
   const allCampaigns = valid.flatMap((r) => r!.campaigns);
 
-  const dailyMap = new Map<string, { impressions: number; clicks: number; spend: number; conversions: number }>();
+  const dailyMap = new Map<string, { campaignId: string; date: string; impressions: number; clicks: number; spend: number; conversions: number }>();
   for (const result of valid) {
     for (const day of result!.dailyMetrics) {
-      const existing = dailyMap.get(day.date);
+      const key = `${day.campaignId}:${day.date}`;
+      const existing = dailyMap.get(key);
       if (existing) {
         existing.impressions += day.impressions;
         existing.clicks += day.clicks;
         existing.spend += day.spend;
         existing.conversions += day.conversions;
       } else {
-        dailyMap.set(day.date, { ...day });
+        dailyMap.set(key, { ...day });
       }
     }
   }
@@ -74,8 +75,7 @@ export async function GET(
   return NextResponse.json({
     isSampleData,
     campaigns: allCampaigns,
-    dailyMetrics: Array.from(dailyMap.entries())
-      .map(([date, m]) => ({ date, ...m }))
+    dailyMetrics: Array.from(dailyMap.values())
       .sort((a, b) => a.date.localeCompare(b.date)),
   });
 }
