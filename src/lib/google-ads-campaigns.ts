@@ -51,8 +51,11 @@ async function gaqlQuery(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    console.error("[gaqlQuery] error", res.status, JSON.stringify(err).slice(0, 800));
+    const details = (err as { error?: { details?: unknown[] } })?.error?.details;
+    const detailStr = details ? ` | details: ${JSON.stringify(details).slice(0, 300)}` : "";
     throw new Error(
-      (err as { error?: { message?: string } })?.error?.message ?? `GAQL error ${res.status}`
+      ((err as { error?: { message?: string } })?.error?.message ?? `GAQL error ${res.status}`) + detailStr
     );
   }
 
