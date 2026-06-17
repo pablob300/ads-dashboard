@@ -134,11 +134,18 @@ export default function ClientDashboard({ client }: { client: Client }) {
     return data.campaigns.filter((c) => c.name.toLowerCase().includes(q));
   }, [data, search]);
 
+  // Quando sub-relatório está ativo, usa os IDs dele como fonte de verdade,
+  // ignorando qualquer dessincronia de selectedCampaigns.
+  const effectiveCampaigns = useMemo(
+    () => (activeSubReport ? new Set(activeSubReport.campaignIds) : selectedCampaigns),
+    [activeSubReport, selectedCampaigns]
+  );
+
   // ── gráfico por campanha ─────────────────────────────────────────────────
   const chartData = useMemo(() => {
     if (!data) return [];
     const dayMap = new Map<string, { date: string; impressions: number; clicks: number; costBRL: number; conversions: number }>();
-    for (const d of data.dailyMetrics.filter((d) => selectedCampaigns.has(d.campaignId))) {
+    for (const d of data.dailyMetrics.filter((d) => effectiveCampaigns.has(d.campaignId))) {
       const existing = dayMap.get(d.date);
       if (existing) {
         existing.impressions += d.impressions;
@@ -150,11 +157,11 @@ export default function ClientDashboard({ client }: { client: Client }) {
       }
     }
     return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [data, selectedCampaigns]);
+  }, [data, effectiveCampaigns]);
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
-    const sel = data?.campaigns.filter((c) => selectedCampaigns.has(c.id)) ?? [];
+    const sel = data?.campaigns.filter((c) => effectiveCampaigns.has(c.id)) ?? [];
     const impressions = sel.reduce((s, c) => s + Number(c.impressions), 0);
     const clicks      = sel.reduce((s, c) => s + Number(c.clicks), 0);
     const costBRL     = sel.reduce((s, c) => s + Number(c.costBRL), 0);
@@ -164,11 +171,11 @@ export default function ClientDashboard({ client }: { client: Client }) {
       ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
       cpc: clicks > 0 ? costBRL / clicks : 0,
     };
-  }, [data, selectedCampaigns]);
+  }, [data, effectiveCampaigns]);
 
   const tableCampaigns = useMemo(
-    () => (data?.campaigns ?? []).filter((c) => selectedCampaigns.has(c.id)),
-    [data, selectedCampaigns]
+    () => (data?.campaigns ?? []).filter((c) => effectiveCampaigns.has(c.id)),
+    [data, effectiveCampaigns]
   );
 
   function toggleMetric(key: MetricKey) {

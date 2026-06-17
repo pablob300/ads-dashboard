@@ -125,10 +125,15 @@ export default function MetaDashboard({ client }: { client: Client }) {
     return data.campaigns.filter((c) => c.name.toLowerCase().includes(q));
   }, [data, search]);
 
+  const effectiveCampaigns = useMemo(
+    () => (activeSubReport ? new Set(activeSubReport.campaignIds) : selectedCampaigns),
+    [activeSubReport, selectedCampaigns]
+  );
+
   const chartData = useMemo(() => {
     if (!data) return [];
     const dayMap = new Map<string, { date: string; impressions: number; clicks: number; spend: number; conversions: number }>();
-    for (const d of data.dailyMetrics.filter((d) => selectedCampaigns.has(d.campaignId))) {
+    for (const d of data.dailyMetrics.filter((d) => effectiveCampaigns.has(d.campaignId))) {
       const existing = dayMap.get(d.date);
       if (existing) {
         existing.impressions += d.impressions;
@@ -140,10 +145,10 @@ export default function MetaDashboard({ client }: { client: Client }) {
       }
     }
     return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [data, selectedCampaigns]);
+  }, [data, effectiveCampaigns]);
 
   const totals = useMemo(() => {
-    const sel = data?.campaigns.filter((c) => selectedCampaigns.has(c.id)) ?? [];
+    const sel = data?.campaigns.filter((c) => effectiveCampaigns.has(c.id)) ?? [];
     const impressions = sel.reduce((s, c) => s + c.impressions, 0);
     const clicks      = sel.reduce((s, c) => s + c.clicks, 0);
     const spend       = sel.reduce((s, c) => s + c.spend, 0);
@@ -152,11 +157,11 @@ export default function MetaDashboard({ client }: { client: Client }) {
       ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
       cpc: clicks > 0 ? spend / clicks : 0,
     };
-  }, [data, selectedCampaigns]);
+  }, [data, effectiveCampaigns]);
 
   const tableCampaigns = useMemo(
-    () => (data?.campaigns ?? []).filter((c) => selectedCampaigns.has(c.id)),
-    [data, selectedCampaigns]
+    () => (data?.campaigns ?? []).filter((c) => effectiveCampaigns.has(c.id)),
+    [data, effectiveCampaigns]
   );
 
   function toggleMetric(key: MetricKey) {
