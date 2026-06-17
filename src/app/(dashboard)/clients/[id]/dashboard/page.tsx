@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import ClientDashboard from "./client-dashboard";
 
 export default async function ClientDashboardPage({
@@ -28,5 +29,9 @@ export default async function ClientDashboardPage({
 
   if (!client) redirect("/clients");
 
-  return <ClientDashboard client={client} />;
+  return (
+    <Suspense>
+      <ClientDashboard client={client} />
+    </Suspense>
+  );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -45,6 +46,12 @@ function fmtNum(v: number) { return v.toLocaleString("pt-BR"); }
 function fmtPct(v: number) { return v.toFixed(2) + "%"; }
 
 export default function MetaDashboard({ client }: { client: Client }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlSub = searchParams.get("sub");
+  const urlTab = searchParams.get("tab");
+
   const init = useMemo(() => defaultRange(), []);
   const [startDate, setStartDate] = useState(init.start);
   const [endDate, setEndDate] = useState(init.end);
@@ -74,6 +81,16 @@ export default function MetaDashboard({ client }: { client: Client }) {
       .then((d) => setSubReports(d.subReports ?? []))
       .catch(() => {});
   }, [client.id]);
+
+  // Ativa sub-relatório a partir da URL (Meta)
+  useEffect(() => {
+    if (!urlSub || urlTab !== "meta" || !subReports.length || !data) return;
+    const found = subReports.find((sr) => sr.id === urlSub);
+    if (found) {
+      setActiveSubReport(found);
+      setSelectedCampaigns(new Set(found.campaignIds));
+    }
+  }, [data, urlSub, urlTab, subReports]);
 
   const fetchData = useCallback(async (start: string, end: string) => {
     if (!start || !end || start > end) return;
@@ -162,8 +179,10 @@ export default function MetaDashboard({ client }: { client: Client }) {
     setActiveSubReport(sr);
     if (sr) {
       setSelectedCampaigns(new Set(sr.campaignIds));
+      router.push(`${pathname}?tab=meta&sub=${sr.id}`);
     } else {
       setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
+      router.push(`${pathname}?tab=meta`);
     }
   }
 
@@ -198,6 +217,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
     if (activeSubReport?.id === id) {
       setActiveSubReport(null);
       setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
+      router.push(`${pathname}?tab=meta`);
     }
     setEditingSubReport(null);
     addToast("Sub-relatório excluído.", "success");

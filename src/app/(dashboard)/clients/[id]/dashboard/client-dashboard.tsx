@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -48,7 +49,13 @@ function fmtDate(dateStr: string) { return dateStr.split("-")[2]; }
 
 // ── componente principal ───────────────────────────────────────────────────
 export default function ClientDashboard({ client }: { client: Client }) {
-  const [activeTab, setActiveTab] = useState<Tab>("google");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const urlSub = searchParams.get("sub");
+
+  const [activeTab, setActiveTab] = useState<Tab>(urlTab === "meta" ? "meta" : "google");
   const init = useMemo(() => defaultRange(), []);
   const [startDate, setStartDate] = useState(init.start);
   const [endDate, setEndDate] = useState(init.end);
@@ -79,6 +86,16 @@ export default function ClientDashboard({ client }: { client: Client }) {
       .then((d) => setSubReports(d.subReports ?? []))
       .catch(() => {});
   }, [client.id]);
+
+  // Ativa sub-relatório a partir da URL (Google)
+  useEffect(() => {
+    if (!urlSub || urlTab === "meta" || !subReports.length || !data) return;
+    const found = subReports.find((sr) => sr.id === urlSub);
+    if (found) {
+      setActiveSubReport(found);
+      setSelectedCampaigns(new Set(found.campaignIds));
+    }
+  }, [data, urlSub, urlTab, subReports]);
 
   // ── busca dados ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async (start: string, end: string) => {
@@ -171,8 +188,10 @@ export default function ClientDashboard({ client }: { client: Client }) {
     setActiveSubReport(sr);
     if (sr) {
       setSelectedCampaigns(new Set(sr.campaignIds));
+      router.push(`${pathname}?tab=google&sub=${sr.id}`);
     } else {
       setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
+      router.push(`${pathname}?tab=google`);
     }
   }
 
@@ -207,6 +226,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
     if (activeSubReport?.id === id) {
       setActiveSubReport(null);
       setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
+      router.push(`${pathname}?tab=google`);
     }
     setEditingSubReport(null);
     addToast("Sub-relatório excluído.", "success");
@@ -251,7 +271,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
             <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill={activeTab === "meta" ? "#1877F2" : "#94a3b8"}><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
           )},
         ].map((tab) => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+          <button key={tab.key} onClick={() => { setActiveTab(tab.key); router.push(`${pathname}?tab=${tab.key}`); }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${activeTab === tab.key ? tab.activeColor : "border-transparent text-slate-500 hover:text-slate-700"}`}
           >
             {tab.icon}{tab.label}
