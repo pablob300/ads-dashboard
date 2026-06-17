@@ -13,12 +13,13 @@ interface CampaignListItem {
 interface Props {
   clientId: string;
   subReport: SubReport;
+  channel: "google" | "meta";
   onUpdated: (subReport: SubReport) => void;
   onDeleted: (id: string) => void;
   onCancel: () => void;
 }
 
-export default function EditSubReportModal({ clientId, subReport, onUpdated, onDeleted, onCancel }: Props) {
+export default function EditSubReportModal({ clientId, subReport, channel, onUpdated, onDeleted, onCancel }: Props) {
   const [name, setName] = useState(subReport.name);
   const [allCampaigns, setAllCampaigns] = useState<CampaignListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(subReport.campaignIds));
@@ -30,12 +31,15 @@ export default function EditSubReportModal({ clientId, subReport, onUpdated, onD
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/clients/${clientId}/campaigns/all`)
+    const endpoint = channel === "meta"
+      ? `/api/clients/${clientId}/meta-campaigns/all`
+      : `/api/clients/${clientId}/campaigns/all`;
+    fetch(endpoint)
       .then((r) => r.json())
       .then((data) => setAllCampaigns(data.campaigns ?? []))
       .catch(() => setAllCampaigns([]))
       .finally(() => setLoadingCampaigns(false));
-  }, [clientId]);
+  }, [clientId, channel]);
 
   function toggle(id: string) {
     setSelectedIds((prev) => {
@@ -48,7 +52,7 @@ export default function EditSubReportModal({ clientId, subReport, onUpdated, onD
   const filtered = allCampaigns.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
-  const enabled  = filtered.filter((c) => c.status === "ENABLED");
+  const enabled  = filtered.filter((c) => c.status === "ENABLED" || c.status === "ACTIVE");
   const paused   = filtered.filter((c) => c.status === "PAUSED");
 
   async function handleSave() {

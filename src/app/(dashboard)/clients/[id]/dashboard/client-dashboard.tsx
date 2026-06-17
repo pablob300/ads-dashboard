@@ -513,6 +513,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
         <EditSubReportModal
           clientId={client.id}
           subReport={editingSubReport}
+          channel="google"
           onUpdated={handleSubReportUpdated}
           onDeleted={handleSubReportDeleted}
           onCancel={() => setEditingSubReport(null)}
