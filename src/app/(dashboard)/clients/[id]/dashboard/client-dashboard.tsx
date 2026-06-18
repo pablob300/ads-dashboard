@@ -16,6 +16,7 @@ import SubReportChips from "@/components/sub-reports/SubReportChips";
 import FunnelMetrics from "@/components/sub-reports/FunnelMetrics";
 import CreateSubReportModal, { type SubReport } from "@/components/sub-reports/CreateSubReportModal";
 import EditSubReportModal from "@/components/sub-reports/EditSubReportModal";
+import { ClientBalanceTooltip } from "@/components/ClientBalanceTooltip";
 
 // ── tipos ──────────────────────────────────────────────────────────────────
 interface Client {
@@ -251,7 +252,10 @@ export default function ClientDashboard({ client }: { client: Client }) {
           </svg>
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-slate-900 truncate">{client.name}</h1>
+          <div className="flex items-center">
+            <h1 className="text-xl font-bold text-slate-900 truncate">{client.name}</h1>
+            <ClientBalanceTooltip clientId={client.id} />
+          </div>
           <p className="text-xs text-slate-400">
             {client.googleAdAccounts.length} conta{client.googleAdAccounts.length !== 1 ? "s" : ""} Google
             {client.metaAdAccounts.length > 0 && ` · ${client.metaAdAccounts.length} conta${client.metaAdAccounts.length !== 1 ? "s" : ""} Meta`}

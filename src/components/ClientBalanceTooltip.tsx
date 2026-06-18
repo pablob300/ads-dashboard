@@ -2,9 +2,19 @@
 
 import { useEffect, useState } from 'react';
 
+interface GoogleAccountBalance {
+  name: string;
+  balance: number | 'postpaid';
+}
+
+interface MetaAccountBalance {
+  name: string;
+  balance: number;
+}
+
 interface Balance {
-  google: number | 'postpaid' | null;
-  meta: number | null;
+  googleAccounts: GoogleAccountBalance[] | null;
+  metaAccounts: MetaAccountBalance[] | null;
 }
 
 function formatBRL(v: number) {
@@ -23,7 +33,10 @@ export function ClientBalanceTooltip({ clientId }: { clientId: string }) {
       .finally(() => setLoading(false));
   }, [clientId]);
 
-  if (!loading && balance?.google == null && balance?.meta == null) return null;
+  if (!loading && balance?.googleAccounts == null && balance?.metaAccounts == null) return null;
+
+  const multiGoogle = (balance?.googleAccounts?.length ?? 0) > 1;
+  const multiMeta = (balance?.metaAccounts?.length ?? 0) > 1;
 
   return (
     <div className="relative group inline-flex items-center ml-1.5">
@@ -36,15 +49,21 @@ export function ClientBalanceTooltip({ clientId }: { clientId: string }) {
             <span className="text-gray-400">Carregando...</span>
           ) : (
             <>
-              {balance?.google === 'postpaid' && (
-                <div>Google: <span className="text-gray-400">Pós-paga</span></div>
-              )}
-              {balance?.google != null && balance.google !== 'postpaid' && (
-                <div>Google: {formatBRL(balance.google)}</div>
-              )}
-              {balance?.meta != null && (
-                <div>Meta: {formatBRL(balance.meta)}</div>
-              )}
+              {balance?.googleAccounts?.map((acc, i) => (
+                <div key={i}>
+                  <span>{multiGoogle ? `Google - ${acc.name}: ` : 'Google: '}</span>
+                  {acc.balance === 'postpaid'
+                    ? <span className="text-gray-400">Pós-paga</span>
+                    : <span>{formatBRL(acc.balance)}</span>
+                  }
+                </div>
+              ))}
+              {balance?.metaAccounts?.map((acc, i) => (
+                <div key={i}>
+                  {multiMeta ? `Meta - ${acc.name}: ` : 'Meta: '}
+                  {formatBRL(acc.balance)}
+                </div>
+              ))}
             </>
           )}
         </div>
