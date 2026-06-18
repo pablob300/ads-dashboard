@@ -177,3 +177,36 @@ export async function fetchCampaignData(
     dailyMetrics: Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
   };
 }
+
+export async function fetchGoogleAdsBalance(
+  tokens: TokenSet,
+  customerId: string
+): Promise<number | null> {
+  try {
+    const accessToken = await getValidAccessToken(tokens);
+    const rows = await gaqlQuery(
+      customerId,
+      accessToken,
+      `SELECT
+         account_budget.approved_spending_limit_micros,
+         account_budget.approved_spending_limit_type,
+         account_budget.amount_served_micros
+       FROM account_budget
+       WHERE account_budget.status = 'APPROVED'
+       ORDER BY account_budget.id DESC
+       LIMIT 1`
+    );
+    if (!rows.length) return null;
+    const b = rows[0].accountBudget as {
+      approvedSpendingLimitType?: string;
+      approvedSpendingLimitMicros?: unknown;
+      amountServedMicros?: unknown;
+    };
+    if (!b || b.approvedSpendingLimitType === "INFINITE") return null;
+    return microsToBRL(
+      Number(b.approvedSpendingLimitMicros ?? 0) - Number(b.amountServedMicros ?? 0)
+    );
+  } catch {
+    return null;
+  }
+}

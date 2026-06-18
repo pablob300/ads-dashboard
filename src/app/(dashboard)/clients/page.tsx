@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { formatCustomerId } from "@/lib/google-ads";
+import { ClientBalanceTooltip } from "@/components/ClientBalanceTooltip";
 
 export default async function ClientsPage() {
   const session = await auth();
@@ -64,7 +65,10 @@ export default async function ClientsPage() {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-900">{client.name}</h3>
+                  <div className="flex items-center">
+                    <h3 className="font-semibold text-slate-900">{client.name}</h3>
+                    <ClientBalanceTooltip clientId={client.id} />
+                  </div>
                   {client.notes && (
                     <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{client.notes}</p>
                   )}

@@ -109,6 +109,23 @@ export async function fetchMetaCampaignData(
   }
 }
 
+export async function fetchMetaAdsBalance(
+  tokens: MetaTokens,
+  accountId: string
+): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `${META_BASE}/${accountId}?fields=balance&access_token=${tokens.accessToken}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.balance == null) return null;
+    return parseFloat(data.balance) / 100;
+  } catch {
+    return null;
+  }
+}
+
 export function generateMetaSampleData(startDate: Date, endDate: Date): MetaCampaignData {
   const campaigns: MetaCampaignMetric[] = [
     { id: "m1", name: "Campanha Alcance - Feed", impressions: 85000, clicks: 1700, spend: 1200, conversions: 28, ctr: 2.0, cpc: 0.71, costPerConversion: 42.86 },
