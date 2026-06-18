@@ -377,3 +377,21 @@ npm run dev
 - **Skeleton screens:** `loading.tsx` para `/dashboard` e `/clients` — exibidos pelo App Router enquanto server components carregam
 - **Toast nos formulários:** sucesso ao criar cliente, ao salvar alias; erro em falhas de API no dashboard e no form de novo cliente
 - **Build verificado:** zero erros TypeScript, todas as 17 rotas compilando
+
+### Sessão 4 — 2026-05-xx (Fase 7 — Sub-relatórios + Links Compartilháveis)
+- **Sub-relatórios (Google + Meta):** criação, edição e exclusão de filtros nomeados por campanhas; chips de seleção rápida no topo do dashboard; modal com busca e toggle de campanhas
+- **Links compartilháveis:** modelo `ShareLink` (token UUID, label, expiry opcional); API pública `/api/share/[token]/*`; página `/share/[token]` sem auth (proxy.ts atualizado); `SharedDashboard` somente-leitura com filtros, gráfico, funil e tabela; `ShareModal` para gerar, copiar e revogar links
+- **Proteção de rotas:** `proxy.ts` substitui `middleware.ts` (Next.js 16 deprecou); `/share/*` liberado sem login
+
+### Sessão 5 — 2026-06-16 (Fase 8 — Dados reais por campanha + URL routing)
+- **Métricas diárias por campanha:** adicionado campo `campaignId: string` em `DailyMetric` (Google) e `MetaDailyMetric` (Meta); chave do mapa diário alterada para `campaignId:date`; GAQL atualizado com `campaign.id`; Meta API com `level=campaign`
+- **Filtro de gráficos/KPIs preciso:** sub-relatório ativo filtra `dailyMetrics` pelos `campaignIds` exatos — eliminou a aproximação por proporção que antes distorcia os dados
+- **URL única por sub-relatório:** selecionar sub-relatório navega para `?tab=google&sub=<id>` (ou `meta`); link é compartilhável e carrega já com filtro ativo; trocar aba ou desselecionar limpa o parâmetro
+- **effectiveCampaigns:** `useMemo` derivado diretamente de `activeSubReport.campaignIds` — evita dessincronização de estado entre `router.push` e `setSelectedCampaigns`; aplicado em `chartData`, `totals`, `tableCampaigns` nos três dashboards (Google, Meta, compartilhado)
+- **EditSubReportModal corrigido:** prop `knownCampaigns` (campanhas já carregadas no dashboard) como fallback quando API `/all` falha; `mergedCampaigns` garante que campanhas selecionadas sempre aparecem independente de status; novo layout "Selecionadas" + "Disponíveis" (removido grupo "Pausadas")
+- **Google Ads API v21:** upgrade de v20 (sunset jun/2026)
+- **Suspense boundary:** `page.tsx` do dashboard envolve `ClientDashboard` em `<Suspense>` para suportar `useSearchParams`
+
+### Sessão 6 — 2026-06-17 (Visual — Funil de Performance)
+- **FunnelMetrics redesenhado:** substituído `FunnelChart` do Recharts (afunilava proporcionalmente aos dados → virava agulha com impressões 2.5M vs conversões 15k) por SVG puro com triângulo equilátero fixo (300×260px ≈ 300×√3/2); três bandas horizontais iguais com separadores brancos; cada seção exibe número em destaque + label abaixo; legenda com percentuais mantida abaixo
+- **Rotina de commit:** a partir desta sessão, cada commit deve incluir atualização deste log com descrição completa do que foi feito, para facilitar pesquisas futuras no histórico git

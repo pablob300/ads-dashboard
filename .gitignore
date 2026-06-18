@@ -43,3 +43,7 @@ next-env.d.ts
 /src/generated/prisma
 
 .vercel
+
+# local dev artifacts
+dev-output.log
+prints/
