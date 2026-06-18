@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 interface Balance {
-  google: number | null;
+  google: number | 'postpaid' | null;
   meta: number | null;
 }
 
@@ -36,8 +36,15 @@ export function ClientBalanceTooltip({ clientId }: { clientId: string }) {
             <span className="text-gray-400">Carregando...</span>
           ) : (
             <>
-              {balance?.google != null && <div>Google: {formatBRL(balance.google)}</div>}
-              {balance?.meta != null && <div>Meta: {formatBRL(balance.meta)}</div>}
+              {balance?.google === 'postpaid' && (
+                <div>Google: <span className="text-gray-400">Pós-paga</span></div>
+              )}
+              {balance?.google != null && balance.google !== 'postpaid' && (
+                <div>Google: {formatBRL(balance.google)}</div>
+              )}
+              {balance?.meta != null && (
+                <div>Meta: {formatBRL(balance.meta)}</div>
+              )}
             </>
           )}
         </div>

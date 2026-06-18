@@ -23,22 +23,28 @@ export async function GET(
   });
   if (!client) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
 
+  const nonMccAccounts = client.googleAdAccounts.filter((acc) => !acc.isManagerAccount);
   const googleBalances = await Promise.all(
-    client.googleAdAccounts
-      .filter((acc) => !acc.isManagerAccount)
-      .map((acc) =>
-        fetchGoogleAdsBalance(
-          {
-            accessToken: acc.connection.accessToken,
-            refreshToken: acc.connection.refreshToken,
-            expiresAt: acc.connection.expiresAt,
-          },
-          acc.customerId
-        )
+    nonMccAccounts.map((acc) =>
+      fetchGoogleAdsBalance(
+        {
+          accessToken: acc.connection.accessToken,
+          refreshToken: acc.connection.refreshToken,
+          expiresAt: acc.connection.expiresAt,
+        },
+        acc.customerId
       )
+    )
   );
   const validGoogle = googleBalances.filter((b): b is number => b !== null);
-  const google = validGoogle.length > 0 ? validGoogle.reduce((a, b) => a + b, 0) : null;
+  let google: number | "postpaid" | null;
+  if (nonMccAccounts.length === 0) {
+    google = null;
+  } else if (validGoogle.length === 0) {
+    google = "postpaid";
+  } else {
+    google = validGoogle.reduce((a, b) => a + b, 0);
+  }
 
   const metaBalances = await Promise.all(
     client.metaAdAccounts.map((acc) =>
@@ -49,7 +55,12 @@ export async function GET(
     )
   );
   const validMeta = metaBalances.filter((b): b is number => b !== null);
-  const meta = validMeta.length > 0 ? validMeta.reduce((a, b) => a + b, 0) : null;
+  let meta: number | null;
+  if (client.metaAdAccounts.length === 0) {
+    meta = null;
+  } else {
+    meta = validMeta.length > 0 ? validMeta.reduce((a, b) => a + b, 0) : 0;
+  }
 
   return NextResponse.json({ google, meta });
 }
