@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
 
 interface HeaderProps {
   user: {
@@ -18,6 +19,21 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+
+  const [gravatarUrl, setGravatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user.email) return;
+    const email = user.email.trim().toLowerCase();
+    crypto.subtle
+      .digest("SHA-256", new TextEncoder().encode(email))
+      .then((buf) => {
+        const hash = Array.from(new Uint8Array(buf))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        setGravatarUrl(`https://www.gravatar.com/avatar/${hash}?s=64&d=mp`);
+      });
+  }, [user.email]);
 
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 shrink-0">
@@ -37,9 +53,17 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         <span className="hidden sm:block text-sm text-slate-600">{user.name}</span>
-        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
-          {initials}
-        </div>
+        {gravatarUrl ? (
+          <img
+            src={gravatarUrl}
+            alt={user.name ?? ""}
+            className="w-8 h-8 rounded-full object-cover shrink-0"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+            {initials}
+          </div>
+        )}
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="text-slate-400 hover:text-slate-600 transition"
