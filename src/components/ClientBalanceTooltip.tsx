@@ -43,7 +43,7 @@ export function ClientBalanceTooltip({ clientId }: { clientId: string }) {
       <span className="w-4 h-4 rounded-full border border-gray-300 text-gray-400 text-[9px] inline-flex items-center justify-center font-bold cursor-default select-none leading-none">
         i
       </span>
-      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 hidden group-hover:block pointer-events-none">
+      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-[9999] hidden group-hover:block pointer-events-none">
         <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs text-gray-700 whitespace-nowrap">
           {loading ? (
             <span className="text-gray-400">Carregando...</span>
