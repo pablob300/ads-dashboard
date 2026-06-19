@@ -254,7 +254,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center">
             <h1 className="text-xl font-bold text-slate-900 truncate">{client.name}</h1>
-            <ClientBalanceTooltip clientId={client.id} />
+            <ClientBalanceTooltip clientId={client.id} direction="down" />
           </div>
           <p className="text-xs text-slate-400">
             {client.googleAdAccounts.length} conta{client.googleAdAccounts.length !== 1 ? "s" : ""} Google
