@@ -7,8 +7,8 @@ Leia antes de qualquer ação. Atualize sempre que houver mudança relevante.
 
 ## O que é este projeto
 
-Dashboard interno para gerenciamento de campanhas **Google Ads** (fase atual) e **Meta Ads** (fase futura).
-Uso: ~5 clientes. Hospedagem: local (Windows 11). Dono: pablodavi@gmail.com
+Dashboard interno para gerenciamento de campanhas **Google Ads** e **Meta Ads**.
+Uso: ~5 clientes. Hospedagem: Vercel (produção) + local Windows 11 (dev). Dono: pablodavi@gmail.com
 
 ---
 
@@ -56,7 +56,7 @@ NEXTAUTH_URL            http://localhost:3000
 NEXTAUTH_SECRET         ads-dashboard-secret-key-change-in-production-32chars
 GOOGLE_CLIENT_ID        570110895293-q5io4v0gqactjcq9pd4mmio97fbeuqts.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET    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
-GOOGLE_ADS_DEVELOPER_TOKEN  (token de teste — Basic Access pendente)
+GOOGLE_ADS_DEVELOPER_TOKEN  (Basic Access aprovado)
 GOOGLE_ADS_CLIENT_ID    igual ao GOOGLE_CLIENT_ID
 GOOGLE_ADS_CLIENT_SECRET    igual ao GOOGLE_CLIENT_SECRET
 ENCRYPTION_KEY          ads-dashboard-encryption-key-32c
@@ -71,36 +71,60 @@ META_APP_SECRET         (Facebook App Secret)
 ```
 src/
 ├── app/
-│   ├── (auth)/login/          Tela de login
-│   ├── (auth)/register/       Tela de cadastro
+│   ├── (auth)/login/              Tela de login
+│   ├── (auth)/register/           Tela de cadastro
 │   ├── (dashboard)/
-│   │   ├── layout.tsx         Layout protegido (auth check)
-│   │   ├── dashboard/         Painel principal
-│   │   ├── clients/           Listagem de clientes
-│   │   ├── clients/new/       Criar cliente + vincular contas
-│   │   ├── clients/[id]/dashboard/  Dashboard por cliente ← FASE 4
-│   │   ├── clients/[id]/edit/ Renomear contas vinculadas
-│   │   └── onboarding/        Conectar Google Ads (OAuth)
+│   │   ├── layout.tsx             Layout protegido (auth check)
+│   │   ├── dashboard/             Painel principal
+│   │   ├── clients/               Listagem de clientes
+│   │   ├── clients/new/           Criar cliente + vincular contas
+│   │   ├── clients/[id]/dashboard/  Dashboard por cliente
+│   │   ├── clients/[id]/edit/     Renomear contas vinculadas
+│   │   ├── onboarding/            Conectar Google Ads (OAuth)
+│   │   └── integrations/          Integrações Google e Meta
+│   ├── (shared)/share/[token]/    Dashboard público compartilhado
 │   └── api/
-│       ├── auth/[...nextauth]/  NextAuth handler
-│       ├── auth/register/       Cadastro de usuário
-│       ├── clients/             GET lista / POST criar
-│       ├── clients/[id]/campaigns/  GET métricas Google Ads
-│       ├── clients/[id]/accounts/[accountId]/  PATCH alias
-│       ├── google-ads/connect/  Inicia OAuth Google Ads
-│       └── google-ads/callback/ Recebe token OAuth
+│       ├── auth/                  NextAuth + register + change-password + forgot-password
+│       ├── clients/               GET lista / POST criar
+│       ├── clients/[id]/campaigns/      GET métricas Google Ads
+│       ├── clients/[id]/meta-campaigns/ GET métricas Meta Ads
+│       ├── clients/[id]/balance/        GET saldo Google + Meta por conta
+│       ├── clients/[id]/accounts/       GET/POST/PATCH contas Google
+│       ├── clients/[id]/meta-accounts/  GET/POST/PATCH contas Meta
+│       ├── clients/[id]/sub-reports/    GET/POST/PATCH/DELETE sub-relatórios
+│       ├── clients/[id]/share/          GET/POST/DELETE links de compartilhamento
+│       ├── google-ads/            connect + callback + accounts
+│       ├── meta-ads/              connect + callback + accounts
+│       └── share/[token]/         Rotas públicas para dashboard compartilhado
 ├── components/
-│   ├── sidebar.tsx            Nav lateral (B300 Dashboard)
-│   └── header.tsx             Topo com user + logout
+│   ├── sidebar.tsx                Nav lateral
+│   ├── header.tsx                 Topo com user, avatar Gravatar e logout
+│   ├── dashboard-shell.tsx        Layout wrapper (sidebar + header)
+│   ├── inactivity-logout.tsx      Auto-logout após 30 min
+│   ├── providers.tsx              Context providers
+│   ├── toast.tsx                  Sistema de notificações
+│   ├── ShareModal.tsx             Modal de links de compartilhamento
+│   ├── ClientBalanceTooltip.tsx   Ícone "i" com saldo das contas no hover
+│   └── sub-reports/               Componentes de sub-relatórios
+│       ├── CreateSubReportModal.tsx
+│       ├── EditSubReportModal.tsx
+│       ├── DeleteConfirmDialog.tsx
+│       ├── SubReportChips.tsx
+│       ├── FunnelMetrics.tsx
+│       └── MonthYearPicker.tsx
 ├── lib/
-│   ├── auth.ts                Config NextAuth
-│   ├── prisma.ts              Singleton Prisma + adapter pg
-│   ├── utils.ts               cn() helper
-│   ├── google-ads.ts          OAuth tokens + listAccessibleAccounts
-│   └── google-ads-campaigns.ts  GAQL queries (dados reais, sem fallback)
+│   ├── auth.ts                    Config NextAuth
+│   ├── prisma.ts                  Singleton Prisma + adapter pg
+│   ├── utils.ts                   cn() helper
+│   ├── email.ts                   Nodemailer + sendTempPasswordEmail
+│   ├── share-token.ts             Validação e dados de links públicos
+│   ├── google-ads.ts              OAuth tokens + listAccessibleAccounts + formatCustomerId
+│   ├── google-ads-campaigns.ts    GAQL queries + fetchGoogleAdsBalance
+│   ├── meta-ads.ts                OAuth Meta + listMetaAdAccounts
+│   └── meta-ads-campaigns.ts      Graph API queries + fetchMetaAdsBalance
 ├── types/
-│   └── next-auth.d.ts         Augmentation session.user.id
-└── generated/prisma/          Cliente Prisma gerado (não editar)
+│   └── next-auth.d.ts             Augmentation session.user.id
+└── generated/prisma/              Cliente Prisma gerado (não editar)
 ```
 
 ---
@@ -140,7 +164,7 @@ Erros da API são propagados e exibidos via toast no dashboard.
 3. **Prisma 7 migrations** — `directUrl` NÃO é suportado em lugar nenhum (nem `schema.prisma` nem `prisma.config.ts`). Migrations são aplicadas manualmente via Supabase SQL Editor antes de cada deploy.
 4. **`params` como Promise** — em route handlers e pages do Next.js 16, sempre `await params`.
 5. **Zod v4** — `err.errors[0]` virou `err.issues[0]`.
-6. **Google Ads API versão** — verificar versão ativa. Em mai/2026 é v20. Script de detecção em `docs/PROJECT.md`.
+6. **Google Ads API versão** — versão ativa é **v21** (v20 teve sunset em jun/2026).
 7. **Token expirado** — `getValidAccessToken()` renova automaticamente se expirar em < 5 min.
 8. **Texto inputs** — Tailwind v4 + globals.css: `input, textarea, select { color: #333333 }`.
 9. **Supabase pooler porta 6543** — modo transaction, não suporta DDL. Nunca usar como DATABASE_URL para migrations.
@@ -157,12 +181,30 @@ Erros da API são propagados e exibidos via toast no dashboard.
 | 4 | ✅ Concluída | Dashboard por cliente: filtros, gráfico linhas, tabela campanhas |
 | 5 | ✅ Concluída | Polish: toast notifications, sidebar mobile, skeleton screens, logout por inatividade |
 | 6 | ✅ Concluída | Meta Ads: OAuth Facebook, vincular contas, dashboard com abas Google/Meta, Integrações na sidebar |
+| 7 | ✅ Concluída | Sub-relatórios, links de compartilhamento público, funil de performance |
+| 8 | ✅ Concluída | Tooltip de saldo por conta (Google + Meta), avatar Gravatar no header |
 
 ---
 
-## Próximos passos imediatos
+## Funcionalidades implementadas — detalhes técnicos
 
-- Configurar app Meta: criar em `developers.facebook.com`, adicionar `META_APP_ID` e `META_APP_SECRET` no `.env`, URI de callback: `http://localhost:3000/api/meta-ads/callback`
+### Tooltip de saldo (`ClientBalanceTooltip`)
+- Componente: `src/components/ClientBalanceTooltip.tsx`
+- Props: `clientId: string`, `direction?: 'up' | 'down'` (padrão: `'up'`)
+- Endpoint: `GET /api/clients/[id]/balance` → `{ googleAccounts, metaAccounts }`
+- Aparece na listagem de clientes (`direction="up"`) e na dashboard interna (`direction="down"`)
+- 1 conta por canal: `Google: R$ XX` / `Meta: R$ XX`
+- Múltiplas contas: `Google - {nome}: R$ XX` / `Meta - {nome}: R$ XX`
+- Google sem `account_budget` (pós-paga) → exibe "Pós-paga"
+- Meta sem `balance` disponível → exibe `R$ 0,00`
+- Google: consulta recurso `account_budget` via GAQL
+- Meta: campo `balance` em `GET /v21.0/{accountId}?fields=balance` (valor em centavos ÷ 100)
+
+### Avatar Gravatar (`header.tsx`)
+- Hash SHA-256 do email (minúsculo, sem espaços) via `crypto.subtle` — nativo do browser
+- URL: `https://www.gravatar.com/avatar/{hash}?s=64&d=mp`
+- `d=mp` exibe silhueta padrão para emails sem Gravatar cadastrado
+- Fallback para círculo com iniciais enquanto hash é computado
 
 ---
 
