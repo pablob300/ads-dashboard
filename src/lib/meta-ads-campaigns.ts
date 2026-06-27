@@ -120,7 +120,7 @@ export async function fetchMetaAdsBalance(
     if (!res.ok) return null;
     const data = await res.json();
     if (data.balance == null) return null;
-    return parseFloat(data.balance) / 100;
+    return parseFloat(data.balance);
   } catch {
     return null;
   }

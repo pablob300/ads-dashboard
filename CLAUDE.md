@@ -198,7 +198,7 @@ Erros da API são propagados e exibidos via toast no dashboard.
 - Google sem `account_budget` (pós-paga) → exibe "Pós-paga"
 - Meta sem `balance` disponível → exibe `R$ 0,00`
 - Google: consulta recurso `account_budget` via GAQL
-- Meta: campo `balance` em `GET /v21.0/{accountId}?fields=balance` (valor em centavos ÷ 100)
+- Meta: campo `balance` em `GET /v21.0/{accountId}?fields=balance` (valor já em BRL — não dividir por 100)
 
 ### Avatar Gravatar (`header.tsx`)
 - Hash SHA-256 do email (minúsculo, sem espaços) via `crypto.subtle` — nativo do browser
