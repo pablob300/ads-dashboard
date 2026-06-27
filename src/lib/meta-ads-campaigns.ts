@@ -115,10 +115,11 @@ export async function fetchMetaAdsBalance(
 ): Promise<number | null> {
   try {
     const res = await fetch(
-      `${META_BASE}/${accountId}?fields=balance&access_token=${tokens.accessToken}`
+      `${META_BASE}/${accountId}?fields=balance,amount_spent,currency,spend_cap,funding_source_details&access_token=${tokens.accessToken}`
     );
     if (!res.ok) return null;
     const data = await res.json();
+    console.log(`[Meta Balance Debug] accountId=${accountId}`, JSON.stringify(data));
     if (data.balance == null) return null;
     return parseFloat(data.balance);
   } catch {
