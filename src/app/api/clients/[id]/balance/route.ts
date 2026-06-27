@@ -56,5 +56,7 @@ export async function GET(
     })
   );
 
-  return NextResponse.json({ googleAccounts, metaAccounts });
+  return NextResponse.json({ googleAccounts, metaAccounts }, {
+    headers: { "Cache-Control": "private, max-age=3600, stale-while-revalidate=60" },
+  });
 }

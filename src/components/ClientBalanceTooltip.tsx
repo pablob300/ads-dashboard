@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 interface GoogleAccountBalance {
   name: string;
@@ -29,17 +29,21 @@ export function ClientBalanceTooltip({
   direction?: 'up' | 'down';
 }) {
   const [balance, setBalance] = useState<Balance | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
 
-  useEffect(() => {
+  function handleMouseEnter() {
+    if (fetched) return;
+    setFetched(true);
+    setLoading(true);
     fetch(`/api/clients/${clientId}/balance`)
       .then((r) => r.json())
       .then(setBalance)
       .catch(() => setBalance(null))
       .finally(() => setLoading(false));
-  }, [clientId]);
+  }
 
-  if (!loading && balance?.googleAccounts == null && balance?.metaAccounts == null) return null;
+  if (fetched && !loading && balance?.googleAccounts == null && balance?.metaAccounts == null) return null;
 
   const multiGoogle = (balance?.googleAccounts?.length ?? 0) > 1;
   const multiMeta = (balance?.metaAccounts?.length ?? 0) > 1;
@@ -71,7 +75,7 @@ export function ClientBalanceTooltip({
   );
 
   return (
-    <div className="relative group inline-flex items-center ml-1.5">
+    <div className="relative group inline-flex items-center ml-1.5" onMouseEnter={handleMouseEnter}>
       <span className="w-4 h-4 rounded-full border border-gray-300 text-gray-400 text-[9px] inline-flex items-center justify-center font-bold cursor-default select-none leading-none">
         i
       </span>
