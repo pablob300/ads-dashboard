@@ -2,13 +2,17 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const session = await auth();
   const userId = (session?.user as { id: string } | undefined)?.id;
   if (!userId) return null;
 
-  const [clientCount, connectionCount] = await Promise.all([
+  const [clientCount, googleAccountCount, metaAccountCount, googleConnectionCount] = await Promise.all([
     prisma.client.count({ where: { userId } }),
+    prisma.googleAdAccount.count({ where: { client: { userId } } }),
+    prisma.metaAdAccount.count({ where: { client: { userId } } }),
     prisma.googleConnection.count({ where: { userId } }),
   ]);
 
@@ -29,12 +33,12 @@ export default async function DashboardPage() {
           <p className="text-3xl font-bold text-slate-900">{clientCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-sm text-slate-500 mb-1">Contas Google vinculadas</p>
-          <p className="text-3xl font-bold text-slate-900">{connectionCount}</p>
+          <p className="text-sm text-slate-500 mb-1">Contas Google Ads</p>
+          <p className="text-3xl font-bold text-slate-900">{googleAccountCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-sm text-slate-500 mb-1">Meta Ads</p>
-          <p className="text-sm text-slate-400 mt-2">Em breve</p>
+          <p className="text-sm text-slate-500 mb-1">Contas Meta Ads</p>
+          <p className="text-3xl font-bold text-slate-900">{metaAccountCount}</p>
         </div>
       </div>
 
@@ -50,7 +54,7 @@ export default async function DashboardPage() {
             Conecte sua conta Google Ads e crie seu primeiro cliente
           </p>
           <div className="flex gap-3 justify-center">
-            {connectionCount === 0 && (
+            {googleConnectionCount === 0 && (
               <Link
                 href="/onboarding"
                 className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition"
