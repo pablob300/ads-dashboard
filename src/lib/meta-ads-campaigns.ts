@@ -109,21 +109,26 @@ export async function fetchMetaCampaignData(
   }
 }
 
+export interface MetaBalanceResult {
+  balance: number | null;
+  rawData: Record<string, unknown>;
+  httpStatus: number;
+}
+
 export async function fetchMetaAdsBalance(
   tokens: MetaTokens,
   accountId: string
-): Promise<number | null> {
+): Promise<MetaBalanceResult> {
   try {
     const res = await fetch(
       `${META_BASE}/${accountId}?fields=balance,amount_spent,currency,spend_cap,funding_source_details&access_token=${tokens.accessToken}`
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    console.log(`[Meta Balance Debug] accountId=${accountId}`, JSON.stringify(data));
-    if (data.balance == null) return null;
-    return parseFloat(data.balance);
-  } catch {
-    return null;
+    const rawData: Record<string, unknown> = await res.json();
+    if (!res.ok) return { balance: null, rawData, httpStatus: res.status };
+    const balance = rawData.balance != null ? parseFloat(rawData.balance as string) : null;
+    return { balance, rawData, httpStatus: res.status };
+  } catch (e) {
+    return { balance: null, rawData: { error: String(e) }, httpStatus: 0 };
   }
 }
 

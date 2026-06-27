@@ -48,11 +48,24 @@ export async function GET(
   const metaAccounts = client.metaAdAccounts.length === 0 ? null : await Promise.all(
     client.metaAdAccounts.map(async (acc) => {
       const name = acc.alias || acc.name;
-      const balance = await fetchMetaAdsBalance(
+      const result = await fetchMetaAdsBalance(
         { accessToken: acc.connection.accessToken, expiresAt: acc.connection.expiresAt },
         acc.accountId
       );
-      return { name, balance: balance !== null ? balance : 0 };
+      // Gravar log de debug (falha silenciosa para não afetar o tooltip)
+      prisma.debugApiLog.create({
+        data: {
+          userId,
+          endpoint: "meta-balance",
+          clientName: client.name,
+          accountId: acc.accountId,
+          accountName: name,
+          rawResponse: result.rawData as Parameters<typeof prisma.debugApiLog.create>[0]["data"]["rawResponse"],
+          parsedValue: result.balance,
+          httpStatus: result.httpStatus,
+        },
+      }).catch(() => {});
+      return { name, balance: result.balance !== null ? result.balance : 0 };
     })
   );
 

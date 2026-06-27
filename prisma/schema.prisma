@@ -125,6 +125,21 @@ model GoogleAdAccount {
   @@map("google_ad_accounts")
 }
 
+model DebugApiLog {
+  id          String   @id @default(cuid())
+  userId      String
+  endpoint    String
+  clientName  String?
+  accountId   String?
+  accountName String?
+  rawResponse Json?
+  parsedValue Float?
+  httpStatus  Int?
+  createdAt   DateTime @default(now())
+
+  @@map("debug_api_logs")
+}
+
 model MetaAdAccount {
   id           String   @id @default(cuid())
   clientId     String
