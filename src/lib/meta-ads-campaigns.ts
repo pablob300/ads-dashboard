@@ -115,6 +115,14 @@ export interface MetaBalanceResult {
   httpStatus: number;
 }
 
+// Extrai valor numérico de strings como "Saldo disponível (R$1.042,37 BRL)"
+function parseBRLFromDisplayString(s: string): number | null {
+  const match = s.match(/R\$\s*([\d.]+,\d{2})/);
+  if (!match) return null;
+  const val = parseFloat(match[1].replace(/\./g, "").replace(",", "."));
+  return isNaN(val) ? null : val;
+}
+
 export async function fetchMetaAdsBalance(
   tokens: MetaTokens,
   accountId: string
@@ -125,7 +133,17 @@ export async function fetchMetaAdsBalance(
     );
     const rawData: Record<string, unknown> = await res.json();
     if (!res.ok) return { balance: null, rawData, httpStatus: res.status };
-    const balance = rawData.balance != null ? parseFloat(rawData.balance as string) : null;
+
+    // Fonte primária: funding_source_details.display_string (valor real exibido no Meta)
+    const fsd = rawData.funding_source_details as Record<string, unknown> | undefined;
+    const displayString = fsd?.display_string as string | undefined;
+    if (displayString) {
+      const balance = parseBRLFromDisplayString(displayString);
+      if (balance !== null) return { balance, rawData, httpStatus: res.status };
+    }
+
+    // Fallback: campo balance (em centavos)
+    const balance = rawData.balance != null ? parseFloat(rawData.balance as string) / 100 : null;
     return { balance, rawData, httpStatus: res.status };
   } catch (e) {
     return { balance: null, rawData: { error: String(e) }, httpStatus: 0 };

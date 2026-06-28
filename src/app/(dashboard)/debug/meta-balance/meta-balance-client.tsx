@@ -138,13 +138,19 @@ export default function MetaBalanceClient({ logs }: { logs: Log[] }) {
                       <div className="text-xs text-slate-400">{log.accountId ?? ""}</div>
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={log.httpStatus} /></td>
-                    <td className="px-4 py-3 font-mono text-slate-700">
-                      {rawBalance != null ? (
-                        <span>
-                          {rawBalance}
-                          {currency && <span className="text-slate-400 text-xs ml-1">{currency}</span>}
-                        </span>
-                      ) : "—"}
+                    <td className="px-4 py-3 text-slate-700">
+                      {(() => {
+                        const fsd = log.rawResponse?.funding_source_details as Record<string, unknown> | undefined;
+                        const ds = fsd?.display_string as string | undefined;
+                        if (ds) return <span className="text-xs">{ds}</span>;
+                        if (rawBalance != null) return (
+                          <span className="font-mono">
+                            {rawBalance}
+                            {currency && <span className="text-slate-400 text-xs ml-1">{currency}</span>}
+                          </span>
+                        );
+                        return "—";
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       {log.parsedValue != null ? (
