@@ -7,7 +7,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from "recharts";
-import type { CampaignData, CampaignMetric } from "@/lib/google-ads-campaigns";
+import type { CampaignData, CampaignMetric, BudgetRecommendation } from "@/lib/google-ads-campaigns";
 import { useToast } from "@/components/toast";
 import MetaDashboard from "./meta-dashboard";
 import ShareModal from "@/components/ShareModal";
@@ -79,6 +79,25 @@ export default function ClientDashboard({ client }: { client: Client }) {
   const [editingSubReport, setEditingSubReport] = useState<SubReport | null>(null);
   const [pendingCampaigns, setPendingCampaigns] = useState<{ id: string; name: string }[]>([]);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Recomendações de orçamento
+  const [recsFetched, setRecsFetched] = useState(false);
+  const [recsLoading, setRecsLoading] = useState(false);
+  const [recommendations, setRecommendations] = useState<BudgetRecommendation[]>([]);
+
+  async function fetchRecommendations() {
+    setRecsLoading(true);
+    setRecsFetched(true);
+    try {
+      const res = await fetch(`/api/clients/${client.id}/recommendations`);
+      const json = await res.json();
+      setRecommendations(json.recommendations ?? []);
+    } catch {
+      setRecommendations([]);
+    } finally {
+      setRecsLoading(false);
+    }
+  }
 
   // Carrega sub-relatórios ao montar
   useEffect(() => {
@@ -468,6 +487,80 @@ export default function ClientDashboard({ client }: { client: Client }) {
               <div className="lg:w-[30%] bg-white border border-slate-200 rounded-xl p-5">
                 <FunnelMetrics totals={totals} />
               </div>
+            </div>
+
+            {/* Recomendações de Orçamento Google */}
+            <div>
+              {!recsFetched ? (
+                <button
+                  onClick={fetchRecommendations}
+                  className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 px-4 py-2.5 rounded-xl transition font-medium"
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Ver sugestões de aumento de verba do Google
+                </button>
+              ) : recsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Consultando recomendações...
+                </div>
+              ) : recommendations.length === 0 ? (
+                <p className="text-sm text-slate-400 px-1">
+                  Nenhuma sugestão de aumento de verba no momento.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    </span>
+                    Sugestões de aumento de verba
+                    <span className="text-xs bg-amber-100 text-amber-700 font-medium px-2 py-0.5 rounded-full">
+                      {recommendations.length}
+                    </span>
+                  </h3>
+                  {recommendations.map((rec) => {
+                    const increase = rec.currentBudgetBRL > 0
+                      ? Math.round(((rec.recommendedBudgetBRL - rec.currentBudgetBRL) / rec.currentBudgetBRL) * 100)
+                      : 0;
+                    const impactImpressions = rec.potentialImpressions - rec.baseImpressions;
+                    return (
+                      <div key={rec.resourceName} className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+                        <p className="text-sm font-semibold text-slate-800 mb-3 truncate">{rec.campaignName}</p>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <p className="text-xs text-slate-500 mb-0.5">Orçamento atual/dia</p>
+                            <p className="font-semibold text-slate-800">{fmtBRL(rec.currentBudgetBRL)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 mb-0.5">Sugerido pelo Google</p>
+                            <p className="font-semibold text-green-700">
+                              {fmtBRL(rec.recommendedBudgetBRL)}
+                              {increase > 0 && (
+                                <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+                                  +{increase}%
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          {impactImpressions > 0 && (
+                            <div>
+                              <p className="text-xs text-slate-500 mb-0.5">Impacto esperado</p>
+                              <p className="font-semibold text-slate-700">+{fmtNum(impactImpressions)} impressões</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Tabela */}

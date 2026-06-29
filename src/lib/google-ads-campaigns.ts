@@ -210,3 +210,62 @@ export async function fetchGoogleAdsBalance(
     return null;
   }
 }
+
+export interface BudgetRecommendation {
+  resourceName: string;
+  campaignId: string;
+  campaignName: string;
+  currentBudgetBRL: number;
+  recommendedBudgetBRL: number;
+  baseImpressions: number;
+  potentialImpressions: number;
+}
+
+export async function fetchBudgetRecommendations(
+  tokens: TokenSet,
+  customerId: string
+): Promise<BudgetRecommendation[]> {
+  try {
+    const accessToken = await getValidAccessToken(tokens);
+    const rows = await gaqlQuery(
+      customerId,
+      accessToken,
+      `SELECT
+         recommendation.resource_name,
+         recommendation.campaign_budget_recommendation.current_budget_amount_micros,
+         recommendation.campaign_budget_recommendation.recommended_budget_amount_micros,
+         recommendation.impact.base_metrics.impressions,
+         recommendation.impact.potential_metrics.impressions,
+         campaign.id,
+         campaign.name
+       FROM recommendation
+       WHERE recommendation.type = 'CAMPAIGN_BUDGET'`
+    );
+
+    return rows.map((row) => {
+      const rec = row.recommendation as {
+        resourceName: string;
+        campaignBudgetRecommendation: {
+          currentBudgetAmountMicros: unknown;
+          recommendedBudgetAmountMicros: unknown;
+        };
+        impact: {
+          baseMetrics: { impressions: unknown };
+          potentialMetrics: { impressions: unknown };
+        };
+      };
+      const campaign = row.campaign as { id: string; name: string };
+      return {
+        resourceName: rec.resourceName,
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        currentBudgetBRL: microsToBRL(Number(rec.campaignBudgetRecommendation.currentBudgetAmountMicros ?? 0)),
+        recommendedBudgetBRL: microsToBRL(Number(rec.campaignBudgetRecommendation.recommendedBudgetAmountMicros ?? 0)),
+        baseImpressions: Number(rec.impact?.baseMetrics?.impressions ?? 0),
+        potentialImpressions: Number(rec.impact?.potentialMetrics?.impressions ?? 0),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
