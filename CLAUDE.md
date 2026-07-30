@@ -62,6 +62,7 @@ GOOGLE_ADS_CLIENT_SECRET    igual ao GOOGLE_CLIENT_SECRET
 ENCRYPTION_KEY          ads-dashboard-encryption-key-32c
 META_APP_ID             (Facebook App ID — developers.facebook.com)
 META_APP_SECRET         (Facebook App Secret)
+CRON_SECRET             protege as rotas /api/cron/* (Vercel Cron envia como Bearer token)
 ```
 
 ---
@@ -165,6 +166,12 @@ expirado) com dados fake, sem avisar o usuário. Erros da API (incluindo token e
 página `/integrations/meta` mostra badge vermelho "Expirado — reconectar" em vez do badge verde
 "Ativo" (que antes aparecia sempre, independente do estado real do token).
 
+**Renovação automática (Vercel Cron):** `GET /api/cron/refresh-meta-tokens` roda 1x/dia (`vercel.json`,
+`0 3 * * *`, protegido por `CRON_SECRET`) e renova qualquer `MetaConnection` a menos de 10 dias de
+expirar — troca o token long-lived atual por um novo com mais 60 dias via `exchangeLongLivedToken`
+(`meta-ads.ts`), sem o usuário precisar reautorizar. Só funciona se o token ainda estiver válido no
+momento da renovação; se já expirou, a única saída é reconectar manualmente em `/integrations/meta`.
+
 ---
 
 ## Banco de dados — tabelas
@@ -194,6 +201,7 @@ página `/integrations/meta` mostra badge vermelho "Expirado — reconectar" em 
 9. **Supabase pooler porta 6543** — modo transaction, não suporta DDL. Nunca usar como DATABASE_URL para migrations.
 10. **Migration pendente em produção** — como migrations do Prisma não são aplicadas automaticamente no Supabase (item 3), páginas que dependem de tabelas novas devem capturar o erro de "tabela não existe" e mostrar instrução visual com o SQL da migration (padrão usado em `/debug/meta-balance`), em vez de quebrar.
 11. **Token Meta sem refresh** — diferente do Google (`getValidAccessToken()`), o Meta não tem refresh token. `fetchMetaCampaignData` checa `expiresAt` antes de chamar a API e lança erro se expirado — nunca cair em dados fake silenciosamente de novo.
+12. **Google refresh_token pode expirar em 7 dias** — se a tela de consentimento OAuth do projeto no Google Cloud Console estiver em status "Testing" (em vez de "In production"), o Google força expiração do refresh_token em 7 dias, mesmo com `access_type=offline`+`prompt=consent` corretos no código. Verificar em APIs & Services → OAuth consent screen se as contas ficarem pedindo reconexão do Google com frequência.
 
 ---
 

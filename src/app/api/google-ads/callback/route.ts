@@ -51,6 +51,8 @@ export async function GET(req: NextRequest) {
     const expiresAt = new Date(Date.now() + expires_in * 1000);
 
     // Salva ou atualiza a conexão
+    // Se o Google não devolver um refresh_token novo (ex: consentimento já concedido antes),
+    // preserva o refresh_token existente em vez de sobrescrever com vazio e quebrar a renovação automática.
     await prisma.googleConnection.upsert({
       where: { id: `${userId}_${googleEmail}`.replace(/[^a-z0-9]/gi, "_") },
       create: {
@@ -64,8 +66,8 @@ export async function GET(req: NextRequest) {
       },
       update: {
         accessToken: access_token,
-        refreshToken: refresh_token ?? "",
         expiresAt,
+        ...(refresh_token ? { refreshToken: refresh_token } : {}),
       },
     });
 
