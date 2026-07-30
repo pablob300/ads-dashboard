@@ -437,3 +437,11 @@ npm run dev
 - **`vercel.json`** criado com `crons: [{ path: "/api/cron/refresh-meta-tokens", schedule: "0 3 * * *" }]` — roda 1x/dia às 3h UTC
 - **`CRON_SECRET`** adicionado ao `.env` local; **precisa ser configurado manualmente nas Environment Variables do projeto na Vercel** (Production) — não foi possível fazer via CLI nesta sessão porque o `vercel whoami` retornou token inválido (usuário não estava logado)
 - Se o token de alguma conta já tiver expirado antes do cron rodar pela primeira vez, a renovação falha (Meta exige token ainda válido) e a única saída continua sendo reconectar manualmente em `/integrations/meta`
+
+### Sessão 12 — 2026-07-29 (Fix — EditSubReportModal só mostrava campanhas já selecionadas)
+- **Sintoma reportado:** ao editar um sub-relatório, só apareciam as campanhas já vinculadas (dava pra remover), mas não dava pra adicionar novas
+- **Causa raiz:** a seção "Disponíveis" filtrava `allCampaigns` (vindo de `/api/clients/[id]/campaigns/all` ou `/meta-campaigns/all`, que busca TODAS as campanhas ativas da conta, sem filtro de período) por `status === "ENABLED" || status === "ACTIVE"`. Se essa chamada falhasse silenciosamente (instabilidade da API, token) ou nenhuma campanha batesse o status esperado, a seção "Disponíveis" ficava vazia e só sobravam as selecionadas (via fallback `knownCampaigns`)
+- **Correção:** a lista de "adicionar" agora usa `knownCampaigns` (= `data.campaigns` do dashboard, já filtrado pelo período de datas selecionado) em vez de `allCampaigns`/status — elimina a dependência da chamada externa para essa lista e alinha com o pedido: mostrar primeiro as selecionadas, depois as que têm impressão no período filtrado
+- `allCampaigns`/`/all` continuam existindo só como fallback de nome/status para campanhas selecionadas que estejam fora do período filtrado atual (para nunca sumirem da seção "Selecionadas")
+- Label da seção renomeado para "Disponíveis no período filtrado" para deixar claro a origem dos dados
+- `CampaignRow` teve o tipo do prop `campaign` relaxado para `{ id, name }` (só o necessário para renderizar), já que a lista `addable` agora vem de `knownCampaigns` sem campo `status`

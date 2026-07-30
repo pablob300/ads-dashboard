@@ -42,8 +42,10 @@ export default function EditSubReportModal({ clientId, subReport, channel, known
       .finally(() => setLoadingCampaigns(false));
   }, [clientId, channel]);
 
-  // Mescla: allCampaigns tem prioridade (status correto), knownCampaigns é fallback para IDs
-  // cujo nome não chegou (API falhou ou token expirado)
+  // Mescla usada só para as JÁ selecionadas: allCampaigns tem status correto,
+  // knownCampaigns é fallback de nome para campanhas fora do período filtrado atual
+  // (ou quando a API "/all" falha/token expirado) — garante que uma campanha vinculada
+  // nunca suma da lista, mesmo sem impressões no período em exibição.
   const mergedCampaigns = useMemo(() => {
     const map = new Map<string, CampaignListItem>();
     for (const c of knownCampaigns ?? []) {
@@ -70,12 +72,10 @@ export default function EditSubReportModal({ clientId, subReport, channel, known
     (c) => selectedIds.has(c.id) && c.name.toLowerCase().includes(q)
   );
 
-  // Campanhas disponíveis para adicionar — somente ativas e não selecionadas
-  const addable = mergedCampaigns.filter(
-    (c) =>
-      !selectedIds.has(c.id) &&
-      (c.status === "ENABLED" || c.status === "ACTIVE") &&
-      c.name.toLowerCase().includes(q)
+  // Campanhas disponíveis para adicionar — as que têm impressão no período filtrado
+  // exibido no dashboard (knownCampaigns = data.campaigns), ainda não selecionadas
+  const addable = (knownCampaigns ?? []).filter(
+    (c) => !selectedIds.has(c.id) && c.name.toLowerCase().includes(q)
   );
 
   async function handleSave() {
@@ -168,11 +168,11 @@ export default function EditSubReportModal({ clientId, subReport, channel, known
                     </>
                   )}
 
-                  {/* Campanhas ativas disponíveis para adicionar */}
+                  {/* Campanhas com impressão no período filtrado, disponíveis para adicionar */}
                   {addable.length > 0 && (
                     <>
                       <div className={`px-3 py-1.5 bg-slate-50 border-b border-slate-100 ${selectedInList.length > 0 ? "border-t border-slate-100" : ""}`}>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Disponíveis</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Disponíveis no período filtrado</p>
                       </div>
                       {addable.map((c) => (
                         <CampaignRow key={c.id} campaign={c} selected={false} onToggle={toggle} />
@@ -231,7 +231,7 @@ export default function EditSubReportModal({ clientId, subReport, channel, known
 function CampaignRow({
   campaign, selected, onToggle,
 }: {
-  campaign: CampaignListItem;
+  campaign: { id: string; name: string };
   selected: boolean;
   onToggle: (id: string) => void;
 }) {
