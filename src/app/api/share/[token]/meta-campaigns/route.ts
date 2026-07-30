@@ -19,7 +19,7 @@ export async function GET(
     const endDate   = searchParams.get("endDate")   ? new Date(searchParams.get("endDate")!   + "T23:59:59") : today;
 
     if (client.metaAdAccounts.length === 0) {
-      return NextResponse.json({ isSampleData: true, campaigns: [], dailyMetrics: [] });
+      return NextResponse.json({ isSampleData: false, campaigns: [], dailyMetrics: [] });
     }
 
     const results = await Promise.all(
@@ -37,10 +37,9 @@ export async function GET(
 
     const valid = results.filter(Boolean);
     if (valid.length === 0) {
-      return NextResponse.json({ isSampleData: true, campaigns: [], dailyMetrics: [] });
+      return NextResponse.json({ isSampleData: false, campaigns: [], dailyMetrics: [] });
     }
 
-    const isSampleData = valid.every((r) => r!.isSampleData);
     const allCampaigns = valid.flatMap((r) => r!.campaigns);
 
     const dailyMap = new Map<string, { impressions: number; clicks: number; spend: number; conversions: number }>();
@@ -59,7 +58,7 @@ export async function GET(
     }
 
     return NextResponse.json({
-      isSampleData,
+      isSampleData: false,
       campaigns: allCampaigns,
       dailyMetrics: Array.from(dailyMap.entries())
         .map(([date, m]) => ({ date, ...m }))
@@ -67,6 +66,7 @@ export async function GET(
     });
   } catch (err) {
     console.error("share meta-campaigns error:", err);
-    return NextResponse.json({ error: "Erro ao buscar campanhas." }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Erro ao buscar campanhas.";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

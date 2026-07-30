@@ -9,7 +9,7 @@ export default async function MetaIntegrationPage() {
   const connections = userId
     ? await prisma.metaConnection.findMany({
         where: { userId },
-        select: { id: true, metaName: true, metaEmail: true, createdAt: true },
+        select: { id: true, metaName: true, metaEmail: true, createdAt: true, expiresAt: true },
         orderBy: { createdAt: "desc" },
       })
     : [];

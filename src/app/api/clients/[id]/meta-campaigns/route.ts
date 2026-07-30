@@ -30,30 +30,35 @@ export async function GET(
   const endDate = endParam ? new Date(endParam + "T23:59:59") : today;
 
   if (client.metaAdAccounts.length === 0) {
-    return NextResponse.json({ isSampleData: true, campaigns: [], dailyMetrics: [] });
+    return NextResponse.json({ isSampleData: false, campaigns: [], dailyMetrics: [] });
   }
 
   const connections = await prisma.metaConnection.findMany({ where: { userId } });
 
-  const results = await Promise.all(
-    client.metaAdAccounts.map(async (account) => {
-      const conn = connections.find((c) => c.id === account.connectionId);
-      if (!conn) return null;
-      return fetchMetaCampaignData(
-        { accessToken: conn.accessToken, expiresAt: conn.expiresAt },
-        account.accountId,
-        startDate,
-        endDate
-      );
-    })
-  );
+  let results;
+  try {
+    results = await Promise.all(
+      client.metaAdAccounts.map(async (account) => {
+        const conn = connections.find((c) => c.id === account.connectionId);
+        if (!conn) return null;
+        return fetchMetaCampaignData(
+          { accessToken: conn.accessToken, expiresAt: conn.expiresAt },
+          account.accountId,
+          startDate,
+          endDate
+        );
+      })
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro ao consultar Meta Ads API";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   const valid = results.filter(Boolean);
   if (valid.length === 0) {
-    return NextResponse.json({ isSampleData: true, campaigns: [], dailyMetrics: [] });
+    return NextResponse.json({ isSampleData: false, campaigns: [], dailyMetrics: [] });
   }
 
-  const isSampleData = valid.every((r) => r!.isSampleData);
   const allCampaigns = valid.flatMap((r) => r!.campaigns);
 
   const dailyMap = new Map<string, { campaignId: string; date: string; impressions: number; clicks: number; spend: number; conversions: number }>();
@@ -73,7 +78,7 @@ export async function GET(
   }
 
   return NextResponse.json({
-    isSampleData,
+    isSampleData: false,
     campaigns: allCampaigns,
     dailyMetrics: Array.from(dailyMap.values())
       .sort((a, b) => a.date.localeCompare(b.date)),

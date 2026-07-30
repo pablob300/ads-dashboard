@@ -97,13 +97,14 @@ export default function MetaDashboard({ client }: { client: Client }) {
     setLoading(true);
     try {
       const res = await fetch(`/api/clients/${client.id}/meta-campaigns?startDate=${start}&endDate=${end}`);
-      const json: MetaCampaignData = await res.json();
-      setData(json);
-      setSelectedCampaigns(new Set(json.campaigns.map((c) => c.id)));
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro ao carregar dados Meta Ads");
+      setData(json as MetaCampaignData);
+      setSelectedCampaigns(new Set((json as MetaCampaignData).campaigns.map((c) => c.id)));
       setActiveSubReport(null);
-    } catch {
+    } catch (err) {
       setData(null);
-      addToast("Erro ao carregar dados Meta Ads.", "error");
+      addToast(err instanceof Error ? err.message : "Erro ao carregar dados Meta Ads.", "error");
     } finally {
       setLoading(false);
     }

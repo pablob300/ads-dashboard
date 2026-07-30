@@ -10,6 +10,7 @@ interface Connection {
   metaName: string | null;
   metaEmail: string | null;
   createdAt: Date;
+  expiresAt: Date | null;
 }
 
 interface Props {
@@ -47,33 +48,46 @@ export default function MetaOnboardingClient({ connections, configured }: Props)
             Contas vinculadas ({connections.length})
           </h2>
           <div className="space-y-2">
-            {connections.map((conn) => (
-              <div
-                key={conn.id}
-                className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3"
-              >
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                  <svg className="w-4 h-4 text-blue-700" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">
-                    {conn.metaName ?? conn.metaEmail ?? "Conta Meta"}
-                  </p>
-                  {conn.metaEmail && (
-                    <p className="text-xs text-slate-400 truncate">{conn.metaEmail}</p>
+            {connections.map((conn) => {
+              const expired = conn.expiresAt ? new Date(conn.expiresAt) < new Date() : false;
+              return (
+                <div
+                  key={conn.id}
+                  className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3"
+                >
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-blue-700" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">
+                      {conn.metaName ?? conn.metaEmail ?? "Conta Meta"}
+                    </p>
+                    {conn.metaEmail && (
+                      <p className="text-xs text-slate-400 truncate">{conn.metaEmail}</p>
+                    )}
+                    <p className="text-xs text-slate-400">
+                      Conectado em {new Date(conn.createdAt).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  {expired ? (
+                    <a
+                      href="/api/meta-ads/connect"
+                      className="flex items-center gap-1 text-xs text-red-600 font-medium bg-red-50 hover:bg-red-100 px-2 py-1 rounded-full shrink-0 transition"
+                    >
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                      Expirado — reconectar
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full shrink-0">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                      Ativo
+                    </span>
                   )}
-                  <p className="text-xs text-slate-400">
-                    Conectado em {new Date(conn.createdAt).toLocaleDateString("pt-BR")}
-                  </p>
                 </div>
-                <span className="flex items-center gap-1 text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full shrink-0">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                  Ativo
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

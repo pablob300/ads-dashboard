@@ -395,3 +395,35 @@ npm run dev
 ### Sessão 6 — 2026-06-17 (Visual — Funil de Performance)
 - **FunnelMetrics redesenhado:** substituído `FunnelChart` do Recharts (afunilava proporcionalmente aos dados → virava agulha com impressões 2.5M vs conversões 15k) por SVG puro com triângulo equilátero fixo (300×260px ≈ 300×√3/2); três bandas horizontais iguais com separadores brancos; cada seção exibe número em destaque + label abaixo; legenda com percentuais mantida abaixo
 - **Rotina de commit:** a partir desta sessão, cada commit deve incluir atualização deste log com descrição completa do que foi feito, para facilitar pesquisas futuras no histórico git
+
+### Sessão 7 — 2026-06-27 (Debug — Investigação do saldo Meta)
+- **Log de campos de saldo Meta:** `meta-ads-campaigns.ts` passou a logar os campos brutos retornados pela API para identificar qual continha o valor correto (saldo Meta estava vindo errado)
+- **Endpoint temporário de inspeção:** `/api/debug/meta-balance` criado para inspecionar o retorno bruto da API Meta balance direto no navegador (removido depois, substituído pela página de Debug permanente)
+- **Página de Debug — Meta Balance:** nova seção "Debug" (collapsible) na sidebar, após "Integrações", com item "Meta Balance"
+  - Página `/debug/meta-balance`: tabela com histórico de chamadas à API do Meta — horário, cliente, conta, HTTP status, valor bruto (API), valor exibido e JSON expandível
+  - Botões "Atualizar" (refresh via server) e "Limpar Logs"
+  - API `GET/DELETE /api/debug/logs?endpoint=meta-balance`
+  - `fetchMetaAdsBalance` passou a retornar também `rawData` e `httpStatus`, além do `balance`
+  - Toda chamada de saldo Meta grava um log em `debug_api_logs` (falha silenciosa se o log não puder ser gravado)
+  - **Novo modelo Prisma `DebugApiLog`** → tabela `debug_api_logs`; migration `20260627000000_add_debug_api_logs`
+
+### Sessão 8 — 2026-06-28 (Fix — Migration pendente + saldo Meta correto)
+- **Página Debug tolera migration pendente:** como o banco de produção (Supabase) não aplica migrations automaticamente ([[project-db-prod]]), a página `/debug/meta-balance` agora captura o erro de tabela inexistente e exibe um card com instrução visual + o SQL exato (`CREATE TABLE "debug_api_logs" ...`) para colar no Supabase SQL Editor, em vez de quebrar a página
+- **Fix no saldo Meta:** o campo `balance` da API do Meta retornava valor incorreto para contas em BRL. O valor real está em `funding_source_details.display_string` (ex: `"Saldo disponível (R$1.042,37 BRL)"`), extraído via regex `R\$[\d.,]+`. Fallback para `balance` em centavos ÷ 100 quando `display_string` não existir
+- Página Debug atualizada para mostrar `display_string` diretamente na coluna de valor
+
+### Sessão 9 — 2026-06-29 (Feature — Sugestões de aumento de verba)
+- **`fetchBudgetRecommendations()`** em `google-ads-campaigns.ts`: consulta GAQL no recurso `recommendation` do tipo `CAMPAIGN_BUDGET`, retornando orçamento atual, orçamento sugerido e impacto estimado em impressões
+- **`GET /api/clients/[id]/recommendations`:** busca recomendações de todas as contas Google do cliente (exclui a MCC)
+- **Dashboard:** botão lazy "Ver sugestões de aumento de verba" em `client-dashboard.tsx` — ao clicar, carrega e exibe cards com campanha, orçamento atual vs sugerido (+X%) e impacto esperado em impressões; seção fica oculta quando não há sugestões
+
+### Sessão 10 — 2026-07-29 (Fix — Meta Ads exibindo dados de teste/demonstração)
+- **Sintoma reportado:** usuário percebeu que o dashboard Meta Ads estava mostrando dados de demonstração em vez dos dados reais das contas vinculadas
+- **Causa raiz:** `fetchMetaCampaignData` (`meta-ads-campaigns.ts`) tinha um `catch` genérico que caía silenciosamente em `generateMetaSampleData()` (5 campanhas fake hardcoded) sempre que a chamada à Graph API falhava por qualquer motivo, ou quando o período consultado retornava 0 campanhas reais. Diferente do Google Ads, esse fallback nunca tinha sido removido
+- **Gatilho mais provável:** o token de acesso do Meta é long-lived mas expira em 60 dias e **não tem refresh token** (diferente do Google, que tem `getValidAccessToken()` renovando automaticamente). Passados os 60 dias sem reconectar, toda chamada à API falhava e caía no fallback fake — sem nenhum aviso visível além de uma tag âmbar discreta "Dados de demonstração". A página `/integrations/meta` também sempre mostrava badge verde "Ativo" independente do estado real do token
+- **Correção aplicada:**
+  - `generateMetaSampleData()` removida; `fetchMetaCampaignData` agora checa `expiresAt` antes de chamar a API e lança erro se expirado; erros da Graph API (incluindo código `190` = token inválido/expirado) são propagados com mensagem legível em vez de mascarados
+  - `/api/clients/[id]/meta-campaigns` e `/api/share/[token]/meta-campaigns` retornam `{ error }` com status 502 em caso de falha, em vez de dados fake
+  - `meta-dashboard.tsx` trata o erro real e mostra via toast (mesmo padrão já usado no Google Ads)
+  - `/integrations/meta`: badge "Ativo" agora reflete `expiresAt` de verdade; conexão expirada mostra badge vermelho "Expirado — reconectar" com link direto para `/api/meta-ads/connect`
+- **Como diagnosticar no futuro:** a página `/debug/meta-balance` já loga HTTP status + JSON bruto de cada chamada de saldo Meta (mesmo token/conta usado nas campanhas) — útil para confirmar rapidamente se o erro é token expirado (código 190)
