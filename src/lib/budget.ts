@@ -25,36 +25,31 @@ export function monthRange(year: number, month: number): { start: Date; end: Dat
   return { start, end };
 }
 
-export interface BudgetCampaignBreakdown {
+/** Sentinela usado no formulário para representar "Total (sem sub-relatório)" — vira subReportId: null */
+export const TOTAL_SENTINEL = "__total__";
+
+/** Opção crua de sub-relatório, usada para montar os selects do formulário */
+export interface SubReportOption {
   id: string;
   name: string;
-  spend: number;
-}
-
-export interface BudgetRow {
-  key: string;                  // subReportId, ou `fallback:${channel}`
-  subReportId: string | null;
   channel: string;
-  name: string;
-  isFallback: boolean;
-  budgetAmount: number | null;  // valor salvo; null = nunca preenchido
-  spent: number;                // já com o ajuste de imposto do Meta aplicado
-  campaigns: BudgetCampaignBreakdown[];
 }
 
-export interface BudgetTotals {
-  budget: number;
+/** Uma verba já salva para o mês, com o gasto real já resolvido (e com o imposto do Meta já aplicado) */
+export interface BudgetEntryRow {
+  subReportId: string | null; // null = linha "Total {Canal}" (sem sub-relatório)
+  channel: string;
+  name: string;               // nome do sub-relatório, ou "Total {Canal}" para o fallback
+  budgetAmount: number;
   spent: number;
 }
 
 export interface GetBudgetResponse {
   year: number;
   month: number;
-  rows: BudgetRow[];
-  totals: {
-    overall: BudgetTotals;
-    byChannel: Record<string, BudgetTotals>;
-  };
+  subReports: SubReportOption[];   // todos os sub-relatórios reais do cliente (para popular os selects)
+  availableChannels: string[];     // canais com conta vinculada, ex: ["google", "meta"]
+  entries: BudgetEntryRow[];       // só o que já foi salvo pra esse mês
   errors: {
     google: string | null;
     meta: string | null;

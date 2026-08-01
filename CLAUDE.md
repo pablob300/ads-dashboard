@@ -25,6 +25,7 @@ Uso: ~5 clientes. Hospedagem: Vercel (produção) + local Windows 11 (dev). Dono
 | Auth | NextAuth.js | v5 beta | `src/lib/auth.ts`. Sessão JWT. Augmentation em `src/types/next-auth.d.ts` |
 | Validação | Zod | **v4** | `.errors` virou **`.issues`** |
 | Gráficos | Recharts | 3.x | |
+| Animação | GSAP | 3.x | Usado só no Controle de Orçamento (contadores + barras animando de 0 até o valor) |
 | Gerador cliente | Prisma Client | output: `src/generated/prisma` | |
 
 ---
@@ -119,7 +120,7 @@ src/
 │   │   ├── FunnelMetrics.tsx
 │   │   └── MonthYearPicker.tsx
 │   └── budget/
-│       └── BudgetRowCard.tsx      Card de linha: canal, input de verba, barra de progresso, +detalhes
+│       └── BudgetSummaryCard.tsx  Card de resumo: nome + canal, barras Planejado/Executado animadas (GSAP)
 ├── lib/
 │   ├── auth.ts                    Config NextAuth
 │   ├── prisma.ts                  Singleton Prisma + adapter pg
@@ -267,14 +268,14 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 - Botão "Controle de Orçamento" no cabeçalho do dashboard do cliente (ao lado de "Compartilhar")
 - Página própria (não modal), padrão igual a `clients/[id]/edit/` — `page.tsx` (server, trata migration pendente) + `budget-control.tsx` (client)
 - Seletor `<input type="month">` — mês fechado único, sem limite de passado/futuro (permite mês corrente em andamento, calculando gasto até hoje)
-- Uma linha por `SubReport` real (Google + Meta juntos, não por aba). Se o mesmo nome existir nos dois canais, aparecem duas linhas
-- Canal por linha (`google`/`meta`) sempre vem do `SubReport.channel` real — select travado, não editável (ver gotcha #13)
-- Se um canal não tem nenhum sub-relatório (mas o cliente tem conta vinculada), aparece uma linha fallback "Total {Canal}" cobrindo todas as campanhas do canal (`subReportId: null`)
+- **Layout em duas partes:**
+  1. **Cards de resumo (topo)** — um `BudgetSummaryCard` por orçamento já salvo no mês (nome + canal, duas barras "Planejado"/"Executado" e os valores, animando de 0 até o total via **GSAP** ao carregar — `gsap.context()` + `gsap.fromTo` nas barras e `gsap.to` num objeto numérico com `onUpdate` escrevendo direto no `textContent` via ref, sem re-render do React). Só aparece o que já tem orçamento cadastrado — nada é pré-montado
+  2. **Cadastro/edição (abaixo)** — formulário construído manualmente: botão "+" adiciona uma linha vazia com 3 campos independentes (select de sub-relatório, select de canal, valor em R$); reabrir a página pré-preenche uma linha por orçamento já salvo (pra permitir editar/remover), e o "+" serve pra adicionar mais
+- **Sub-relatório e canal são dois campos livres**, não vêm mais travados: o select de sub-relatório lista os nomes distintos de `SubReport` do cliente (todos os canais) + a opção "Total (sem sub-relatório)"; o select de canal é filtrado dinamicamente pelas opções válidas daquele nome (`data.subReports.filter(sr => sr.name === nome)`), ou por `availableChannels` se for "Total". A resolução (nome, canal) → `subReportId` acontece no client antes de enviar — ver gotcha #13 sobre por que o vínculo real é sempre pelo `subReportId`, nunca pelo par (nome, canal)
+- **Duplicata**: se duas linhas resolverem para o mesmo (`subReportId` ou "total", canal), a partir da segunda ocorrência a linha fica destacada em vermelho com badge "Duplicado" e o botão Salvar é desabilitado até resolver. Validado de novo no servidor (400 se o payload enviado tiver duplicata, defesa em profundidade)
 - Campanhas fora de qualquer sub-relatório não são rastreadas (fora de escopo)
-- `GET/POST /api/clients/[id]/budget`: GET agrega gasto ao vivo via `fetchCampaignData`/`fetchMetaCampaignData` (sem cache) para o mês, por canal com try/catch independente (erro num canal não derruba o outro); POST salva em lote (`findFirst` → `update`/`create`, dentro de `$transaction` — não usa `upsert` por causa do fallback `subReportId: null`)
+- `GET/POST /api/clients/[id]/budget`: GET retorna só o que já foi salvo pra aquele mês (`entries`), mais a lista crua de `subReports` e `availableChannels` pra montar os selects — agrega gasto ao vivo via `fetchCampaignData`/`fetchMetaCampaignData` (sem cache), por canal com try/catch independente (erro num canal não derruba o outro). POST é **declarativo**: dentro de uma `$transaction`, apaga do banco qualquer entrada do mês que não esteja mais na lista enviada (permite remover linha pelo "✕") e depois faz `findFirst` (por `clientId+subReportId+channel+year+month`) → `update`/`create` pra cada uma enviada — não usa `upsert` por causa do fallback `subReportId: null` (`channel` entra no filtro pra não confundir "Total Google" com "Total Meta", já que ambos têm `subReportId: null`)
 - Gasto Meta sempre passa por `grossUpMetaSpend()` (÷ 0,8785) antes de somar — ver gotcha #14
-- `BudgetRowCard`: barra de progresso horizontal (CSS puro, sem lib de gráfico) + "+ detalhes" expansível com gasto por campanha
-- Botão único "Salvar orçamentos" (lote, não autosave por linha)
 
 ### Fix Meta Ads — remoção do fallback de dados fake (2026-07-29)
 - **Causa raiz identificada:** `fetchMetaCampaignData` caía silenciosamente em `generateMetaSampleData()` (5 campanhas fake hardcoded) sempre que a chamada à Graph API falhava por qualquer motivo — incluindo token expirado (Meta não tem refresh token, expira em 60 dias) — ou quando retornava 0 campanhas no período

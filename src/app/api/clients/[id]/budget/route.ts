@@ -6,9 +6,7 @@ import {
   channelLabel,
   grossUpMetaSpend,
   monthRange,
-  type BudgetCampaignBreakdown,
-  type BudgetRow,
-  type BudgetTotals,
+  type BudgetEntryRow,
   type GetBudgetResponse,
 } from "@/lib/budget";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,84 +15,6 @@ import { z } from "zod/v4";
 interface CampaignSpend {
   name: string;
   raw: number;
-}
-
-interface SubReportLite {
-  id: string;
-  channel: string;
-  name: string;
-  campaignIds: string[];
-}
-
-interface SavedEntryLite {
-  subReportId: string | null;
-  channel: string;
-  amount: number;
-}
-
-function buildChannelRows(
-  channel: string,
-  spendMap: Map<string, CampaignSpend>,
-  subReports: SubReportLite[],
-  savedEntries: SavedEntryLite[],
-  rows: BudgetRow[]
-) {
-  const channelSubReports = subReports.filter((sr) => sr.channel === channel);
-
-  function buildCampaigns(ids: string[]): BudgetCampaignBreakdown[] {
-    return ids
-      .map((id) => {
-        const entry = spendMap.get(id);
-        const raw = entry?.raw ?? 0;
-        const spend = channel === "meta" ? grossUpMetaSpend(raw) : raw;
-        return { id, name: entry?.name ?? `Campanha ${id}`, spend };
-      })
-      .sort((a, b) => b.spend - a.spend);
-  }
-
-  if (channelSubReports.length > 0) {
-    for (const sr of channelSubReports) {
-      const campaigns = buildCampaigns(sr.campaignIds);
-      const saved = savedEntries.find((e) => e.subReportId === sr.id);
-      rows.push({
-        key: sr.id,
-        subReportId: sr.id,
-        channel,
-        name: sr.name,
-        isFallback: false,
-        budgetAmount: saved?.amount ?? null,
-        spent: campaigns.reduce((s, c) => s + c.spend, 0),
-        campaigns,
-      });
-    }
-  } else {
-    const campaigns = buildCampaigns(Array.from(spendMap.keys()));
-    const saved = savedEntries.find((e) => e.subReportId === null && e.channel === channel);
-    rows.push({
-      key: `fallback:${channel}`,
-      subReportId: null,
-      channel,
-      name: `Total ${channelLabel(channel)}`,
-      isFallback: true,
-      budgetAmount: saved?.amount ?? null,
-      spent: campaigns.reduce((s, c) => s + c.spend, 0),
-      campaigns,
-    });
-  }
-}
-
-function computeTotals(rows: BudgetRow[]): GetBudgetResponse["totals"] {
-  const byChannel: Record<string, BudgetTotals> = {};
-  let overallBudget = 0;
-  let overallSpent = 0;
-  for (const row of rows) {
-    const bucket = byChannel[row.channel] ?? (byChannel[row.channel] = { budget: 0, spent: 0 });
-    bucket.budget += row.budgetAmount ?? 0;
-    bucket.spent += row.spent;
-    overallBudget += row.budgetAmount ?? 0;
-    overallSpent += row.spent;
-  }
-  return { overall: { budget: overallBudget, spent: overallSpent }, byChannel };
 }
 
 export async function GET(
@@ -120,7 +40,7 @@ export async function GET(
 
   const { start, end } = monthRange(year, month);
 
-  const subReports = await prisma.subReport.findMany({
+  const subReportsRaw = await prisma.subReport.findMany({
     where: { clientId },
     orderBy: { createdAt: "asc" },
   });
@@ -129,8 +49,12 @@ export async function GET(
     where: { clientId, year, month },
   });
 
+  const availableChannels: string[] = [];
+  if (client.googleAdAccounts.length > 0) availableChannels.push("google");
+  if (client.metaAdAccounts.length > 0) availableChannels.push("meta");
+
   const errors: GetBudgetResponse["errors"] = { google: null, meta: null };
-  const rows: BudgetRow[] = [];
+  const spendMaps: Record<string, Map<string, CampaignSpend>> = {};
 
   if (client.googleAdAccounts.length > 0) {
     try {
@@ -156,7 +80,7 @@ export async function GET(
           else map.set(c.id, { name: c.name, raw: c.costBRL });
         }
       }
-      buildChannelRows("google", map, subReports, savedEntries, rows);
+      spendMaps.google = map;
     } catch (err) {
       errors.google = err instanceof Error ? err.message : "Erro ao consultar Google Ads API";
     }
@@ -186,15 +110,45 @@ export async function GET(
           else map.set(c.id, { name: c.name, raw: c.spend });
         }
       }
-      buildChannelRows("meta", map, subReports, savedEntries, rows);
+      spendMaps.meta = map;
     } catch (err) {
       errors.meta = err instanceof Error ? err.message : "Erro ao consultar Meta Ads API";
     }
   }
 
-  const totals = computeTotals(rows);
+  const entries: BudgetEntryRow[] = savedEntries.map((e) => {
+    const map = spendMaps[e.channel];
+    let campaignIds: string[];
+    let name: string;
 
-  const response: GetBudgetResponse = { year, month, rows, totals, errors };
+    if (e.subReportId) {
+      const sr = subReportsRaw.find((s) => s.id === e.subReportId);
+      campaignIds = sr?.campaignIds ?? [];
+      name = sr?.name ?? "(sub-relatório removido)";
+    } else {
+      campaignIds = map ? Array.from(map.keys()) : [];
+      name = `Total ${channelLabel(e.channel)}`;
+    }
+
+    let spent = 0;
+    if (map) {
+      for (const id of campaignIds) {
+        const raw = map.get(id)?.raw ?? 0;
+        spent += e.channel === "meta" ? grossUpMetaSpend(raw) : raw;
+      }
+    }
+
+    return { subReportId: e.subReportId, channel: e.channel, name, budgetAmount: e.amount, spent };
+  });
+
+  const response: GetBudgetResponse = {
+    year,
+    month,
+    subReports: subReportsRaw.map((sr) => ({ id: sr.id, name: sr.name, channel: sr.channel })),
+    availableChannels,
+    entries,
+    errors,
+  };
   return NextResponse.json(response);
 }
 
@@ -209,6 +163,10 @@ const postSchema = z.object({
   month: z.number().int().min(1).max(12),
   entries: z.array(entrySchema),
 });
+
+function entryKey(subReportId: string | null, channel: string): string {
+  return `${subReportId ?? "null"}:${channel}`;
+}
 
 export async function POST(
   req: NextRequest,
@@ -230,6 +188,15 @@ export async function POST(
   }
   const { year, month, entries } = parsed.data;
 
+  const seenKeys = new Set<string>();
+  for (const e of entries) {
+    const key = entryKey(e.subReportId, e.channel);
+    if (seenKeys.has(key)) {
+      return NextResponse.json({ error: "Existem sub-relatório e canal duplicados no envio." }, { status: 400 });
+    }
+    seenKeys.add(key);
+  }
+
   const subReportIds = entries
     .map((e) => e.subReportId)
     .filter((id): id is string => id !== null);
@@ -244,14 +211,23 @@ export async function POST(
   }
 
   await prisma.$transaction(async (tx) => {
+    const existing = await tx.budgetEntry.findMany({ where: { clientId, year, month } });
+    const submittedKeys = new Set(entries.map((e) => entryKey(e.subReportId, e.channel)));
+
+    for (const ex of existing) {
+      if (!submittedKeys.has(entryKey(ex.subReportId, ex.channel))) {
+        await tx.budgetEntry.delete({ where: { id: ex.id } });
+      }
+    }
+
     for (const entry of entries) {
-      const existing = await tx.budgetEntry.findFirst({
-        where: { clientId, subReportId: entry.subReportId, year, month },
+      const found = await tx.budgetEntry.findFirst({
+        where: { clientId, subReportId: entry.subReportId, channel: entry.channel, year, month },
       });
-      if (existing) {
+      if (found) {
         await tx.budgetEntry.update({
-          where: { id: existing.id },
-          data: { amount: entry.amount, channel: entry.channel },
+          where: { id: found.id },
+          data: { amount: entry.amount },
         });
       } else {
         await tx.budgetEntry.create({
