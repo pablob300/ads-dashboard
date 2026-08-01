@@ -74,6 +74,7 @@ model Client {
   metaAdAccounts   MetaAdAccount[]
   subReports       SubReport[]
   shareLinks       ShareLink[]
+  budgetEntries    BudgetEntry[]
 
   @@map("clients")
 }
@@ -100,9 +101,29 @@ model SubReport {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  budgetEntries BudgetEntry[]
 
   @@map("sub_reports")
+}
+
+model BudgetEntry {
+  id          String   @id @default(cuid())
+  clientId    String
+  subReportId String?  // null = linha fallback "Total {Canal}" (canal sem sub-relatórios)
+  channel     String   // "google" | "meta" | extensível — vem do SubReport.channel ou é o canal do fallback
+  year        Int
+  month       Int      // 1-12
+  amount      Float    // orçamento mensal em BRL, digitado manualmente
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  subReport SubReport? @relation(fields: [subReportId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, subReportId, year, month])
+  @@index([clientId, year, month])
+  @@map("budget_entries")
 }
 
 model GoogleAdAccount {

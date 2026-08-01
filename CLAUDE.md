@@ -81,6 +81,7 @@ src/
 │   │   ├── clients/new/           Criar cliente + vincular contas
 │   │   ├── clients/[id]/dashboard/  Dashboard por cliente
 │   │   ├── clients/[id]/edit/     Renomear contas vinculadas
+│   │   ├── clients/[id]/budget/   Controle de Orçamento (verba vs. gasto real, por mês)
 │   │   ├── onboarding/            Conectar Google Ads (OAuth)
 │   │   ├── integrations/          Integrações Google e Meta
 │   │   └── debug/meta-balance/    Debug: histórico de chamadas à API de saldo Meta
@@ -92,6 +93,7 @@ src/
 │       ├── clients/[id]/meta-campaigns/ GET métricas Meta Ads
 │       ├── clients/[id]/balance/        GET saldo Google + Meta por conta
 │       ├── clients/[id]/recommendations/ GET sugestões de aumento de verba (Google Ads)
+│       ├── clients/[id]/budget/         GET/POST Controle de Orçamento (verba mensal vs. gasto real)
 │       ├── clients/[id]/accounts/       GET/POST/PATCH contas Google
 │       ├── clients/[id]/meta-accounts/  GET/POST/PATCH contas Meta
 │       ├── clients/[id]/sub-reports/    GET/POST/PATCH/DELETE sub-relatórios
@@ -109,13 +111,15 @@ src/
 │   ├── toast.tsx                  Sistema de notificações
 │   ├── ShareModal.tsx             Modal de links de compartilhamento
 │   ├── ClientBalanceTooltip.tsx   Ícone "i" com saldo das contas no hover
-│   └── sub-reports/               Componentes de sub-relatórios
-│       ├── CreateSubReportModal.tsx
-│       ├── EditSubReportModal.tsx
-│       ├── DeleteConfirmDialog.tsx
-│       ├── SubReportChips.tsx
-│       ├── FunnelMetrics.tsx
-│       └── MonthYearPicker.tsx
+│   ├── sub-reports/               Componentes de sub-relatórios
+│   │   ├── CreateSubReportModal.tsx
+│   │   ├── EditSubReportModal.tsx
+│   │   ├── DeleteConfirmDialog.tsx
+│   │   ├── SubReportChips.tsx
+│   │   ├── FunnelMetrics.tsx
+│   │   └── MonthYearPicker.tsx
+│   └── budget/
+│       └── BudgetRowCard.tsx      Card de linha: canal, input de verba, barra de progresso, +detalhes
 ├── lib/
 │   ├── auth.ts                    Config NextAuth
 │   ├── prisma.ts                  Singleton Prisma + adapter pg
@@ -125,7 +129,8 @@ src/
 │   ├── google-ads.ts              OAuth tokens + listAccessibleAccounts + formatCustomerId
 │   ├── google-ads-campaigns.ts    GAQL queries + fetchGoogleAdsBalance
 │   ├── meta-ads.ts                OAuth Meta + listMetaAdAccounts
-│   └── meta-ads-campaigns.ts      Graph API queries + fetchMetaAdsBalance
+│   ├── meta-ads-campaigns.ts      Graph API queries + fetchMetaAdsBalance
+│   └── budget.ts                  Cálculo de mês fechado, imposto Meta, tipos do Controle de Orçamento
 ├── types/
 │   └── next-auth.d.ts             Augmentation session.user.id
 └── generated/prisma/              Cliente Prisma gerado (não editar)
@@ -185,6 +190,7 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 - `sub_reports` — relatórios filtrados por canal e campanhas
 - `share_links` — links públicos de compartilhamento de dashboard
 - `debug_api_logs` — histórico de chamadas de debug (ex: saldo Meta) com raw response, valor parseado e HTTP status
+- `budget_entries` — verba mensal (BRL) por sub-relatório (ou por canal, se o canal ainda não tem sub-relatórios), por ano/mês
 
 ---
 
@@ -202,6 +208,8 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 10. **Migration pendente em produção** — como migrations do Prisma não são aplicadas automaticamente no Supabase (item 3), páginas que dependem de tabelas novas devem capturar o erro de "tabela não existe" e mostrar instrução visual com o SQL da migration (padrão usado em `/debug/meta-balance`), em vez de quebrar.
 11. **Token Meta sem refresh** — diferente do Google (`getValidAccessToken()`), o Meta não tem refresh token. `fetchMetaCampaignData` checa `expiresAt` antes de chamar a API e lança erro se expirado — nunca cair em dados fake silenciosamente de novo.
 12. **Google refresh_token pode expirar em 7 dias** — se a tela de consentimento OAuth do projeto no Google Cloud Console estiver em status "Testing" (em vez de "In production"), o Google força expiração do refresh_token em 7 dias, mesmo com `access_type=offline`+`prompt=consent` corretos no código. Verificar em APIs & Services → OAuth consent screen se as contas ficarem pedindo reconexão do Google com frequência.
+13. **`SubReport` não tem constraint único** em `(clientId, channel, name)` — nada impede dois sub-relatórios com o mesmo nome no mesmo canal. Por isso `BudgetEntry` vincula pelo `subReportId` real, nunca pelo par (nome, canal).
+14. **Imposto Meta no Controle de Orçamento** — gasto efetivo Meta = gasto bruto ÷ 0,8785 (imposto de 12,15%, só incide no Meta). Ver `META_TAX_GROSS_UP_DIVISOR` em `src/lib/budget.ts` — único lugar onde essa divisão deve acontecer.
 
 ---
 
@@ -219,6 +227,7 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 | 8 | ✅ Concluída | Tooltip de saldo por conta (Google + Meta), avatar Gravatar no header |
 | 9 | ✅ Concluída | Página de Debug (histórico de chamadas Meta Balance), fix saldo Meta, sugestões de aumento de verba (Google Ads) |
 | 10 | ✅ Concluída | Fix Meta Ads: removido fallback de dados fake, erros propagados via toast, detecção de token expirado com aviso de reconexão em `/integrations/meta` |
+| 11 | ✅ Concluída | Renovação automática de tokens Meta (Vercel Cron), fix EditSubReportModal (campanhas disponíveis por período), Controle de Orçamento (verba vs. gasto real por mês, com imposto Meta) |
 
 ---
 
@@ -253,6 +262,19 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 - `fetchBudgetRecommendations()` em `google-ads-campaigns.ts`: GAQL no recurso `recommendation`, tipo `CAMPAIGN_BUDGET`
 - `GET /api/clients/[id]/recommendations`: agrega recomendações de todas as contas Google do cliente (exclui MCC)
 - Botão lazy "Ver sugestões de aumento de verba" em `client-dashboard.tsx` — carrega sob demanda; cards mostram orçamento atual vs sugerido (+X%) e impacto estimado em impressões; seção some se não houver sugestões
+
+### Controle de Orçamento (`/clients/[id]/budget`)
+- Botão "Controle de Orçamento" no cabeçalho do dashboard do cliente (ao lado de "Compartilhar")
+- Página própria (não modal), padrão igual a `clients/[id]/edit/` — `page.tsx` (server, trata migration pendente) + `budget-control.tsx` (client)
+- Seletor `<input type="month">` — mês fechado único, sem limite de passado/futuro (permite mês corrente em andamento, calculando gasto até hoje)
+- Uma linha por `SubReport` real (Google + Meta juntos, não por aba). Se o mesmo nome existir nos dois canais, aparecem duas linhas
+- Canal por linha (`google`/`meta`) sempre vem do `SubReport.channel` real — select travado, não editável (ver gotcha #13)
+- Se um canal não tem nenhum sub-relatório (mas o cliente tem conta vinculada), aparece uma linha fallback "Total {Canal}" cobrindo todas as campanhas do canal (`subReportId: null`)
+- Campanhas fora de qualquer sub-relatório não são rastreadas (fora de escopo)
+- `GET/POST /api/clients/[id]/budget`: GET agrega gasto ao vivo via `fetchCampaignData`/`fetchMetaCampaignData` (sem cache) para o mês, por canal com try/catch independente (erro num canal não derruba o outro); POST salva em lote (`findFirst` → `update`/`create`, dentro de `$transaction` — não usa `upsert` por causa do fallback `subReportId: null`)
+- Gasto Meta sempre passa por `grossUpMetaSpend()` (÷ 0,8785) antes de somar — ver gotcha #14
+- `BudgetRowCard`: barra de progresso horizontal (CSS puro, sem lib de gráfico) + "+ detalhes" expansível com gasto por campanha
+- Botão único "Salvar orçamentos" (lote, não autosave por linha)
 
 ### Fix Meta Ads — remoção do fallback de dados fake (2026-07-29)
 - **Causa raiz identificada:** `fetchMetaCampaignData` caía silenciosamente em `generateMetaSampleData()` (5 campanhas fake hardcoded) sempre que a chamada à Graph API falhava por qualquer motivo — incluindo token expirado (Meta não tem refresh token, expira em 60 dias) — ou quando retornava 0 campanhas no período

@@ -280,6 +280,15 @@ export default function ClientDashboard({ client }: { client: Client }) {
             {client.metaAdAccounts.length > 0 && ` · ${client.metaAdAccounts.length} conta${client.metaAdAccounts.length !== 1 ? "s" : ""} Meta`}
           </p>
         </div>
+        <Link
+          href={`/clients/${client.id}/budget`}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:border-blue-400 hover:text-blue-600 bg-white transition"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .672-3 1.5S10.343 11 12 11s3 .672 3 1.5-1.343 1.5-3 1.5m0-6c1.11 0 2.08.402 2.599 1M12 8V6.5M12 15v1.5m0-9C8.686 7.5 6 9.567 6 12s2.686 4.5 6 4.5 6-2.067 6-4.5S15.314 7.5 12 7.5z" />
+          </svg>
+          Controle de Orçamento
+        </Link>
         <button
           onClick={() => setShowShareModal(true)}
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:border-blue-400 hover:text-blue-600 bg-white transition"
