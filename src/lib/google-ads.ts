@@ -1,5 +1,11 @@
-const GOOGLE_ADS_API_VERSION = "v21";
-const BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
+// Cada versão da API vive ~9 meses. Quando fizer sunset, a API responde
+// UNSUPPORTED_VERSION ("Version vXX is deprecated") em toda chamada.
+// Único lugar onde a versão é definida — os outros módulos importam daqui.
+// GOOGLE_ADS_API_VERSION no .env permite trocar a versão sem mexer no código.
+export const GOOGLE_ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION ?? "v25";
+export const GOOGLE_ADS_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
+
+const BASE_URL = GOOGLE_ADS_BASE_URL;
 
 interface TokenSet {
   accessToken: string;

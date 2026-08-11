@@ -1,10 +1,9 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getValidAccessToken } from "@/lib/google-ads";
+import { getValidAccessToken, GOOGLE_ADS_BASE_URL } from "@/lib/google-ads";
 import { NextRequest, NextResponse } from "next/server";
 
-const GOOGLE_ADS_API_VERSION = "v21";
-const BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
+const BASE_URL = GOOGLE_ADS_BASE_URL;
 
 export interface CampaignListItem {
   id: string;

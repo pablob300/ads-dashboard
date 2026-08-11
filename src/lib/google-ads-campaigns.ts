@@ -1,7 +1,6 @@
-import { getValidAccessToken } from "./google-ads";
+import { getValidAccessToken, GOOGLE_ADS_BASE_URL } from "./google-ads";
 
-const GOOGLE_ADS_API_VERSION = "v21";
-const BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
+const BASE_URL = GOOGLE_ADS_BASE_URL;
 
 interface TokenSet {
   accessToken: string;

@@ -60,6 +60,7 @@ GOOGLE_CLIENT_SECRET    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
 GOOGLE_ADS_DEVELOPER_TOKEN  (Basic Access aprovado)
 GOOGLE_ADS_CLIENT_ID    igual ao GOOGLE_CLIENT_ID
 GOOGLE_ADS_CLIENT_SECRET    igual ao GOOGLE_CLIENT_SECRET
+GOOGLE_ADS_API_VERSION      (opcional) sobrescreve a versão da API; default v25 no código
 ENCRYPTION_KEY          ads-dashboard-encryption-key-32c
 META_APP_ID             (Facebook App ID — developers.facebook.com)
 META_APP_SECRET         (Facebook App Secret)
@@ -143,7 +144,7 @@ src/
 
 | Item | Valor |
 |---|---|
-| Versão API | **v21** (v20 foi sunset em jun/2026) |
+| Versão API | **v25** (v21 fez sunset em 05/08/2026) — definida **só** em `src/lib/google-ads.ts`; override pela env `GOOGLE_ADS_API_VERSION` |
 | Developer Token | **Basic Access aprovado** — acessa contas reais |
 | Basic Access | **✅ Aprovado** |
 | OAuth Callback | `http://localhost:3000/api/google-ads/callback` |
@@ -202,7 +203,7 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 3. **Prisma 7 migrations** — `directUrl` NÃO é suportado em lugar nenhum (nem `schema.prisma` nem `prisma.config.ts`). Migrations são aplicadas manualmente via Supabase SQL Editor antes de cada deploy.
 4. **`params` como Promise** — em route handlers e pages do Next.js 16, sempre `await params`.
 5. **Zod v4** — `err.errors[0]` virou `err.issues[0]`.
-6. **Google Ads API versão** — versão ativa é **v21** (v20 teve sunset em jun/2026).
+6. **Google Ads API versão** — versão ativa é **v25**. Cada versão vive ~9 meses e o sunset **não tem carência**: no dia marcado a API passa a rejeitar tudo com `UNSUPPORTED_VERSION` ("Version vXX is deprecated"), e a dashboard do Google quebra inteira. Foi o que aconteceu com v21 em 05/08/2026. A versão é declarada **em um único lugar** (`GOOGLE_ADS_API_VERSION` em `src/lib/google-ads.ts`, que exporta `GOOGLE_ADS_BASE_URL`) — os outros módulos importam de lá, nunca redeclaram. Para trocar sem editar código, definir `GOOGLE_ADS_API_VERSION` no `.env`.
 7. **Token expirado** — `getValidAccessToken()` renova automaticamente se expirar em < 5 min.
 8. **Texto inputs** — Tailwind v4 + globals.css: `input, textarea, select { color: #333333 }`.
 9. **Supabase pooler porta 6543** — modo transaction, não suporta DDL. Nunca usar como DATABASE_URL para migrations.

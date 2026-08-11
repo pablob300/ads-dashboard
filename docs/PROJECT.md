@@ -132,7 +132,11 @@ GET /api/google-ads/callback?code=XXX
 
 ## Google Ads API — Detalhes Técnicos
 
-### Versão atual: v20
+### Versão atual: v25
+Definida em **um único lugar**: `GOOGLE_ADS_API_VERSION` em `src/lib/google-ads.ts`, que exporta
+também `GOOGLE_ADS_BASE_URL`. `google-ads-campaigns.ts` e `api/clients/[id]/campaigns/all/route.ts`
+importam daí — nunca redeclarar a versão localmente. Pode ser sobrescrita pela env `GOOGLE_ADS_API_VERSION`.
+
 Cada versão tem vida útil de ~9 meses. Script para detectar versão ativa:
 ```javascript
 for (const v of ['v19','v20','v21','v22','v23','v24','v25']) {
@@ -468,3 +472,12 @@ npm run dev
 - **`GET/POST /api/clients/[id]/budget` reescritos**: GET agora retorna só o que **já foi salvo** naquele mês (`entries`), mais `subReports` (lista crua) e `availableChannels` pra montar os selects — não monta mais linhas automáticas por sub-relatório nem fallback "Total {Canal}" quando o canal não tem sub-relatório (isso virou uma opção manual, não automática). POST agora é **declarativo**: dentro da `$transaction`, primeiro apaga do banco qualquer entrada do mês que não esteja mais na lista enviada (permite remover linha pelo "✕" e refletir no banco), depois faz `findFirst`→`update`/`create` — o filtro do `findFirst` passou a incluir `channel` (antes só `clientId+subReportId+year+month`, o que confundia "Total Google" com "Total Meta" quando ambos têm `subReportId: null`)
 - **`src/lib/budget.ts`**: `BudgetRow`/`BudgetCampaignBreakdown`/`GetBudgetResponse.totals` removidos (não são mais necessários sem o "+ detalhes" e sem os subtotais por canal); novos tipos `SubReportOption`, `BudgetEntryRow`, `TOTAL_SENTINEL`
 - `npx tsc --noEmit` limpo. Não testado no navegador — sem credenciais de login local
+
+### Sessão 15 — 2026-08-10 (Fix — Google Ads API v21 sunset, upgrade para v25)
+- **Sintoma:** ao abrir a dashboard do Google, toda chamada falhava com `Request contains an invalid argument` e, no detalhe, `GoogleAdsFailure` → `requestError: UNSUPPORTED_VERSION` / `"Version v21 is deprecated. Requests to this version will be blocked."`
+- **Causa:** **v21 fez sunset em 05/08/2026** (anunciado no Google Ads Developer Blog). Não é depreciação com aviso — a partir da data o endpoint simplesmente rejeita tudo, sem período de carência. A versão foi para v21 na Sessão 5 e ficou fixa desde então
+- **Correção:** upgrade para **v25** (última estável, lançada em 22/07/2026 — dá o maior tempo de vida até o próximo sunset). Confirmado por probe HTTP que v22–v25 existem e v26 ainda não (404)
+- **Versão centralizada:** a string `"v21"` estava **duplicada em 3 arquivos** (`src/lib/google-ads.ts`, `src/lib/google-ads-campaigns.ts`, `src/app/api/clients/[id]/campaigns/all/route.ts`), cada um montando seu próprio `BASE_URL`. Agora `google-ads.ts` exporta `GOOGLE_ADS_API_VERSION` e `GOOGLE_ADS_BASE_URL`, e os outros dois importam — o próximo sunset se resolve mudando **uma** linha
+- **Override por env:** `GOOGLE_ADS_API_VERSION` no `.env` sobrescreve o default (`process.env.GOOGLE_ADS_API_VERSION ?? "v25"`), pra dar rollback rápido pra v24 se v25 quebrar algo sem precisar editar código
+- **Verificação:** `npx tsc --noEmit` limpo. **Não validado com chamada real à API** — o `.env` local aponta pro Postgres local (sem `google_connections` cadastradas) e o `.env.vercel.local` vem com `DATABASE_URL`/`DIRECT_URL` vazios (Vercel não exporta valores sensíveis no pull), então não havia refresh token pra testar daqui. Confirmar abrindo a dashboard depois do deploy
+- **`npm run build` falha localmente** com `UNKNOWN: unknown error, read` no passo "Running TypeScript" — **pré-existente**, reproduzido na árvore limpa via `git stash` antes de qualquer alteração. É flake do worker do Next no Windows/OneDrive, não do código
