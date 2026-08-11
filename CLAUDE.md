@@ -25,6 +25,7 @@ Uso: ~5 clientes. Hospedagem: Vercel (produção) + local Windows 11 (dev). Dono
 | Auth | NextAuth.js | v5 beta | `src/lib/auth.ts`. Sessão JWT. Augmentation em `src/types/next-auth.d.ts` |
 | Validação | Zod | **v4** | `.errors` virou **`.issues`** |
 | Gráficos | Recharts | 3.x | |
+| Fontes | next/font/google | — | **Sora** (headlines) e **Roboto** (corpo), ambas variable. Carregadas em `app/layout.tsx`, aplicadas em `globals.css` |
 | Animação | GSAP | 3.x | Usado só no Controle de Orçamento (contadores + barras animando de 0 até o valor) |
 | Gerador cliente | Prisma Client | output: `src/generated/prisma` | |
 
@@ -211,7 +212,8 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 11. **Token Meta sem refresh** — diferente do Google (`getValidAccessToken()`), o Meta não tem refresh token. `fetchMetaCampaignData` checa `expiresAt` antes de chamar a API e lança erro se expirado — nunca cair em dados fake silenciosamente de novo.
 12. **Google refresh_token pode expirar em 7 dias** — se a tela de consentimento OAuth do projeto no Google Cloud Console estiver em status "Testing" (em vez de "In production"), o Google força expiração do refresh_token em 7 dias, mesmo com `access_type=offline`+`prompt=consent` corretos no código. Verificar em APIs & Services → OAuth consent screen se as contas ficarem pedindo reconexão do Google com frequência.
 13. **`SubReport` não tem constraint único** em `(clientId, channel, name)` — nada impede dois sub-relatórios com o mesmo nome no mesmo canal. Por isso `BudgetEntry` vincula pelo `subReportId` real, nunca pelo par (nome, canal).
-14. **Imposto Meta no Controle de Orçamento** — gasto efetivo Meta = gasto bruto ÷ 0,8785 (imposto de 12,15%, só incide no Meta). Ver `META_TAX_GROSS_UP_DIVISOR` em `src/lib/budget.ts` — único lugar onde essa divisão deve acontecer.
+14. **Tipografia** — headlines usam **Sora Bold**, o resto **Roboto Regular**. As duas são variable fonts carregadas via `next/font/google` em `app/layout.tsx` (variáveis `--font-sora` / `--font-roboto`). `globals.css` aplica Roboto no `body` e Sora 700 em `h1`–`h6`; o utilitário `font-display` (do `@theme inline`) aplica Sora em headline que não seja heading. Cuidado: uma classe de peso explícita num heading (`font-semibold`) vence a regra base — a família continua Sora, mas o peso vira o da classe. Para headline em bold de verdade, usar `font-bold`.
+15. **Imposto Meta no Controle de Orçamento** — gasto efetivo Meta = gasto bruto ÷ 0,8785 (imposto de 12,15%, só incide no Meta). Ver `META_TAX_GROSS_UP_DIVISOR` em `src/lib/budget.ts` — único lugar onde essa divisão deve acontecer.
 
 ---
 
@@ -269,6 +271,7 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 - Botão "Controle de Orçamento" no cabeçalho do dashboard do cliente (ao lado de "Compartilhar")
 - Página própria (não modal), padrão igual a `clients/[id]/edit/` — `page.tsx` (server, trata migration pendente) + `budget-control.tsx` (client)
 - Seletor `<input type="month">` — mês fechado único, sem limite de passado/futuro (permite mês corrente em andamento, calculando gasto até hoje)
+- **Cards agrupados por canal:** os cards de resumo são separados por canal, cada grupo com uma headline (`Google`, `Meta`) em Sora Bold. No desktop (`lg+`) os canais ficam **lado a lado** — Google à esquerda, Meta à direita, 2 cards por linha dentro de cada coluna; abaixo de `lg` empilham, Google em cima e Meta embaixo. Se só um canal tem orçamento cadastrado, ele ocupa a largura toda e cabem 3 cards por linha. Ordem em `CHANNEL_ORDER` (`budget-control.tsx`); canal desconhecido vai para o fim
 - **Layout em duas partes:**
   1. **Cards de resumo (topo)** — um `BudgetSummaryCard` por orçamento já salvo no mês (nome + canal, duas barras "Planejado"/"Executado" e os valores, animando de 0 até o total via **GSAP** ao carregar — `gsap.context()` + `gsap.fromTo` nas barras e `gsap.to` num objeto numérico com `onUpdate` escrevendo direto no `textContent` via ref, sem re-render do React). Só aparece o que já tem orçamento cadastrado — nada é pré-montado
   2. **Cadastro/edição (abaixo)** — formulário construído manualmente: botão "+" adiciona uma linha vazia com 3 campos independentes (select de sub-relatório, select de canal, valor em R$); reabrir a página pré-preenche uma linha por orçamento já salvo (pra permitir editar/remover), e o "+" serve pra adicionar mais

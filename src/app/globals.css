@@ -8,8 +8,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  /* gera o utilitário `font-display` para headlines fora de h1–h6 */
+  --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,7 +24,17 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
+}
+
+/* Headlines em Sora Bold. Vem depois do @import "tailwindcss" de propósito:
+   o preflight reseta headings para font-weight: inherit, e esta regra o sobrescreve.
+   Um utilitário explícito (font-semibold, etc.) num heading ainda vence — nesse caso
+   o peso é o da classe, mas a família continua Sora. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
 }
 
 input, textarea, select {

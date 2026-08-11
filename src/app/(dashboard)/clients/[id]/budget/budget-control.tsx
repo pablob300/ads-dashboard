@@ -3,13 +3,37 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/toast";
-import type { GetBudgetResponse } from "@/lib/budget";
+import type { BudgetEntryRow, GetBudgetResponse } from "@/lib/budget";
 import { TOTAL_SENTINEL, channelLabel } from "@/lib/budget";
 import BudgetSummaryCard from "@/components/budget/BudgetSummaryCard";
 
 interface Client {
   id: string;
   name: string;
+}
+
+/** Ordem das colunas de canal; canais desconhecidos vão para o fim, em ordem alfabética. */
+const CHANNEL_ORDER = ["google", "meta"];
+
+interface ChannelGroup {
+  channel: string;
+  entries: BudgetEntryRow[];
+}
+
+function groupByChannel(entries: BudgetEntryRow[]): ChannelGroup[] {
+  const byChannel = new Map<string, BudgetEntryRow[]>();
+  for (const entry of entries) {
+    const list = byChannel.get(entry.channel);
+    if (list) list.push(entry);
+    else byChannel.set(entry.channel, [entry]);
+  }
+  const rank = (c: string) => {
+    const i = CHANNEL_ORDER.indexOf(c);
+    return i === -1 ? CHANNEL_ORDER.length : i;
+  };
+  return Array.from(byChannel.entries())
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([channel, items]) => ({ channel, entries: items }));
 }
 
 interface FormRow {
@@ -138,8 +162,17 @@ export default function BudgetControl({ client }: { client: Client }) {
 
   const subReportNames = data ? Array.from(new Set(data.subReports.map((sr) => sr.name))) : [];
 
+  const channelGroups = data ? groupByChannel(data.entries) : [];
+  // Com dois ou mais canais, cada um vira uma coluna (lg+) e os cards ficam 2 por linha
+  // dentro dela. Com um canal só, ele ocupa a largura toda e cabem 3 cards por linha.
+  const multiChannel = channelGroups.length > 1;
+  const groupsGridClass = multiChannel ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1";
+  const cardsGridClass = multiChannel
+    ? "grid-cols-1 sm:grid-cols-2"
+    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/clients" className="text-slate-400 hover:text-slate-600 transition">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -147,7 +180,7 @@ export default function BudgetControl({ client }: { client: Client }) {
           </svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{client.name}</h1>
+          <h1 className="font-display text-2xl font-bold text-slate-900">{client.name}</h1>
           <p className="text-slate-500 text-sm">Controle de Orçamento</p>
         </div>
       </div>
@@ -162,21 +195,37 @@ export default function BudgetControl({ client }: { client: Client }) {
         />
       </div>
 
-      {/* Cards de resumo */}
+      {/* Cards de resumo, agrupados por canal */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <div key={i} className="h-48 bg-slate-100 rounded-xl animate-pulse" />)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-8">
+          {[1, 2].map((col) => (
+            <div key={col} className="space-y-3">
+              <div className="h-6 w-24 bg-slate-100 rounded animate-pulse" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[1, 2].map((i) => <div key={i} className="h-48 bg-slate-100 rounded-xl animate-pulse" />)}
+              </div>
+            </div>
+          ))}
         </div>
-      ) : data && data.entries.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {data.entries.map((e) => (
-            <BudgetSummaryCard
-              key={`${e.subReportId ?? "total"}:${e.channel}`}
-              name={e.name}
-              channel={e.channel}
-              budget={e.budgetAmount}
-              spent={e.spent}
-            />
+      ) : channelGroups.length > 0 ? (
+        <div className={`grid gap-x-6 gap-y-8 ${groupsGridClass}`}>
+          {channelGroups.map((group) => (
+            <section key={group.channel} className="space-y-3">
+              <h2 className="font-display text-lg font-bold text-slate-900 pb-2 border-b border-slate-200">
+                {channelLabel(group.channel)}
+              </h2>
+              <div className={`grid gap-4 ${cardsGridClass}`}>
+                {group.entries.map((e) => (
+                  <BudgetSummaryCard
+                    key={`${e.subReportId ?? "total"}:${e.channel}`}
+                    name={e.name}
+                    channel={e.channel}
+                    budget={e.budgetAmount}
+                    spent={e.spent}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       ) : (
@@ -188,7 +237,7 @@ export default function BudgetControl({ client }: { client: Client }) {
       {/* Cadastro / edição */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-700">Cadastrar / editar orçamentos</h2>
+          <h2 className="font-display text-sm font-bold text-slate-700">Cadastrar / editar orçamentos</h2>
           <button
             type="button"
             onClick={addRow}
