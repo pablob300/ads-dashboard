@@ -133,7 +133,10 @@ src/
 │   ├── google-ads-campaigns.ts    GAQL queries + fetchGoogleAdsBalance
 │   ├── meta-ads.ts                OAuth Meta + listMetaAdAccounts
 │   ├── meta-ads-campaigns.ts      Graph API queries + fetchMetaAdsBalance
-│   └── budget.ts                  Cálculo de mês fechado, imposto Meta, tipos do Controle de Orçamento
+│   ├── budget.ts                  Cálculo de mês fechado, tipos do Controle de Orçamento
+│   ├── channels.ts                Registro de canais: rótulo, imposto, endpoint de campanhas, ordem
+│   ├── sub-reports.ts             Tipo SubReport + helpers de campaignsByChannel (usado no client)
+│   └── sub-reports-schema.ts      Schemas Zod das rotas de sub-relatório (server-only)
 ├── types/
 │   └── next-auth.d.ts             Augmentation session.user.id
 └── generated/prisma/              Cliente Prisma gerado (não editar)
@@ -190,7 +193,8 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 - `clients` — clientes gerenciados
 - `google_ad_accounts` — contas Google Ads por cliente (campo `alias` para renomear)
 - `meta_ad_accounts` — contas Meta Ads por cliente
-- `sub_reports` — relatórios filtrados por canal e campanhas
+- `sub_reports` — relatório nomeado, comum a todos os canais (nome único por cliente)
+- `sub_report_campaigns` — campanhas de um sub-relatório, uma linha por (canal, campanha)
 - `share_links` — links públicos de compartilhamento de dashboard
 - `debug_api_logs` — histórico de chamadas de debug (ex: saldo Meta) com raw response, valor parseado e HTTP status
 - `budget_entries` — verba mensal (BRL) por sub-relatório (ou por canal, se o canal ainda não tem sub-relatórios), por ano/mês
@@ -211,9 +215,11 @@ momento da renovação; se já expirou, a única saída é reconectar manualment
 10. **Migration pendente em produção** — como migrations do Prisma não são aplicadas automaticamente no Supabase (item 3), páginas que dependem de tabelas novas devem capturar o erro de "tabela não existe" e mostrar instrução visual com o SQL da migration (padrão usado em `/debug/meta-balance`), em vez de quebrar.
 11. **Token Meta sem refresh** — diferente do Google (`getValidAccessToken()`), o Meta não tem refresh token. `fetchMetaCampaignData` checa `expiresAt` antes de chamar a API e lança erro se expirado — nunca cair em dados fake silenciosamente de novo.
 12. **Google refresh_token pode expirar em 7 dias** — se a tela de consentimento OAuth do projeto no Google Cloud Console estiver em status "Testing" (em vez de "In production"), o Google força expiração do refresh_token em 7 dias, mesmo com `access_type=offline`+`prompt=consent` corretos no código. Verificar em APIs & Services → OAuth consent screen se as contas ficarem pedindo reconexão do Google com frequência.
-13. **`SubReport` não tem constraint único** em `(clientId, channel, name)` — nada impede dois sub-relatórios com o mesmo nome no mesmo canal. Por isso `BudgetEntry` vincula pelo `subReportId` real, nunca pelo par (nome, canal).
-14. **Tipografia** — headlines usam **Sora Bold**, o resto **Roboto Regular**. As duas são variable fonts carregadas via `next/font/google` em `app/layout.tsx` (variáveis `--font-sora` / `--font-roboto`). `globals.css` aplica Roboto no `body` e Sora 700 em `h1`–`h6`; o utilitário `font-display` (do `@theme inline`) aplica Sora em headline que não seja heading. Cuidado: uma classe de peso explícita num heading (`font-semibold`) vence a regra base — a família continua Sora, mas o peso vira o da classe. Para headline em bold de verdade, usar `font-bold`.
-15. **Imposto Meta no Controle de Orçamento** — gasto efetivo Meta = gasto bruto ÷ 0,8785 (imposto de 12,15%, só incide no Meta). Ver `META_TAX_GROSS_UP_DIVISOR` em `src/lib/budget.ts` — único lugar onde essa divisão deve acontecer.
+13. **Sub-relatório é comum a todos os canais** — um `SubReport` por cliente (`@@unique([clientId, name])`), com as campanhas de cada canal em `sub_report_campaigns` (`subReportId + channel + campaignId`). Antes ele tinha coluna `channel` e "Sub1" existia duas vezes, uma por canal. Consequências: (a) `BudgetEntry.channel` **precisa** estar na chave única, senão a verba de Google e a de Meta do mesmo sub-relatório no mesmo mês colidem; (b) as duas abas do dashboard listam os mesmos sub-relatórios, e cada uma filtra por `campaignIdsFor(sr, canal)`; (c) um sub-relatório sem campanha do canal ativo aparece zerado, de propósito.
+14. **Zod v4: `z.record` com chave enum é exaustivo** — `z.record(z.enum(["google","meta"]), ...)` exige **todas** as chaves e rejeita `{ google: [...] }` com "expected array, received undefined". Para mapa parcial por canal, usar `z.record(z.string(), ...)` + refine nas chaves. Ver `src/lib/sub-reports-schema.ts`.
+15. **Tipografia** — headlines usam **Sora Bold**, o resto **Roboto Regular**. As duas são variable fonts carregadas via `next/font/google` em `app/layout.tsx` (variáveis `--font-sora` / `--font-roboto`). `globals.css` aplica Roboto no `body` e Sora 700 em `h1`–`h6`; o utilitário `font-display` (do `@theme inline`) aplica Sora em headline que não seja heading. Cuidado: uma classe de peso explícita num heading (`font-semibold`) vence a regra base — a família continua Sora, mas o peso vira o da classe. Para headline em bold de verdade, usar `font-bold`.
+16. **Imposto Meta no Controle de Orçamento** — gasto efetivo Meta = gasto bruto ÷ 0,8785 (imposto de 12,15%, só incide no Meta). Aplicado por `grossUpSpend(valor, canal)` em `src/lib/channels.ts`, que lê `taxDivisor` do registro do canal — único lugar onde essa divisão deve acontecer.
+17. **`node_modules` no OneDrive** — 39 mil arquivos ficam só na nuvem, e o Turbopack/tsc falha ao lê-los com `os error 426` ("operação na nuvem não concluída"). É a causa real do `npm run build` quebrado e de 500 aleatórios no `next dev`. Contorno pontual: ler os arquivos do pacote que falhou para forçar a hidratação. Correção definitiva: marcar `node_modules` como "sempre manter neste dispositivo" no OneDrive, ou tirar o projeto da pasta sincronizada.
 
 ---
 

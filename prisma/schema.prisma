@@ -92,26 +92,46 @@ model ShareLink {
   @@map("share_links")
 }
 
+// Um sub-relatório é comum a todos os canais: "Sub1" é um registro só por cliente,
+// com campanhas de Google e de Meta (e de canais futuros) penduradas nele.
 model SubReport {
-  id          String   @id @default(cuid())
-  clientId    String
-  channel     String   // "google" | "meta" | extensível
-  name        String
-  campaignIds String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client        Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaigns     SubReportCampaign[]
   budgetEntries BudgetEntry[]
 
+  @@unique([clientId, name])
   @@map("sub_reports")
+}
+
+// Vínculo campanha ↔ sub-relatório. O canal fica aqui, na campanha, e não no
+// sub-relatório: IDs de campanha do Google e do Meta são strings decimais sem
+// prefixo, vindas de espaços de ID independentes, então guardá-los num array
+// plano seria ambíguo. Um canal novo passa a ser só dado.
+model SubReportCampaign {
+  id          String   @id @default(cuid())
+  subReportId String
+  channel     String   // "google" | "meta" | extensível
+  campaignId  String
+  createdAt   DateTime @default(now())
+
+  subReport SubReport @relation(fields: [subReportId], references: [id], onDelete: Cascade)
+
+  @@unique([subReportId, channel, campaignId])
+  @@index([subReportId])
+  @@map("sub_report_campaigns")
 }
 
 model BudgetEntry {
   id          String   @id @default(cuid())
   clientId    String
   subReportId String?  // null = linha fallback "Total {Canal}" (canal sem sub-relatórios)
-  channel     String   // "google" | "meta" | extensível — vem do SubReport.channel ou é o canal do fallback
+  channel     String   // "google" | "meta" | extensível — o canal desta verba
   year        Int
   month       Int      // 1-12
   amount      Float    // orçamento mensal em BRL, digitado manualmente
@@ -121,7 +141,10 @@ model BudgetEntry {
   client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
   subReport SubReport? @relation(fields: [subReportId], references: [id], onDelete: Cascade)
 
-  @@unique([clientId, subReportId, year, month])
+  // `channel` é obrigatório na chave: como um sub-relatório agora cobre os dois
+  // canais, a verba de Google e a de Meta do mesmo sub-relatório no mesmo mês
+  // compartilham o subReportId e colidiriam sem ele.
+  @@unique([clientId, subReportId, channel, year, month])
   @@index([clientId, year, month])
   @@map("budget_entries")
 }

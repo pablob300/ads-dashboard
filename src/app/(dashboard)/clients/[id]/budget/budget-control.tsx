@@ -38,8 +38,8 @@ function groupByChannel(entries: BudgetEntryRow[]): ChannelGroup[] {
 
 interface FormRow {
   key: string;
-  subReportName: string; // "" = não escolhido, TOTAL_SENTINEL, ou nome real
-  channel: string;       // "" = não escolhido
+  subReportId: string; // "" = não escolhido, TOTAL_SENTINEL, ou o id real
+  channel: string;     // "" = não escolhido
   amount: string;
 }
 
@@ -49,7 +49,7 @@ function currentMonthValue() {
 }
 
 function newRow(): FormRow {
-  return { key: crypto.randomUUID(), subReportName: "", channel: "", amount: "" };
+  return { key: crypto.randomUUID(), subReportId: "", channel: "", amount: "" };
 }
 
 export default function BudgetControl({ client }: { client: Client }) {
@@ -72,9 +72,7 @@ export default function BudgetControl({ client }: { client: Client }) {
       setRows(
         result.entries.map((e) => ({
           key: crypto.randomUUID(),
-          subReportName: e.subReportId
-            ? result.subReports.find((sr) => sr.id === e.subReportId)?.name ?? ""
-            : TOTAL_SENTINEL,
+          subReportId: e.subReportId ?? TOTAL_SENTINEL,
           channel: e.channel,
           amount: String(e.budgetAmount),
         }))
@@ -102,21 +100,11 @@ export default function BudgetControl({ client }: { client: Client }) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
-  function channelsForName(name: string): string[] {
-    if (!data || !name) return [];
-    if (name === TOTAL_SENTINEL) return data.availableChannels;
-    return data.subReports.filter((sr) => sr.name === name).map((sr) => sr.channel);
-  }
-
-  function resolveSubReportId(name: string, channel: string): string | null {
-    if (!data || !name || name === TOTAL_SENTINEL) return null;
-    return data.subReports.find((sr) => sr.name === name && sr.channel === channel)?.id ?? null;
-  }
-
+  // O sub-relatório é comum aos canais, então o canal da verba é livre: qualquer
+  // canal com conta vinculada serve, independente do sub-relatório escolhido.
   function dupKey(row: FormRow): string | null {
-    if (!row.subReportName || !row.channel) return null;
-    const subReportId = resolveSubReportId(row.subReportName, row.channel);
-    return `${subReportId ?? "total"}:${row.channel}`;
+    if (!row.subReportId || !row.channel) return null;
+    return `${row.subReportId}:${row.channel}`;
   }
 
   const duplicateKeys = (() => {
@@ -131,7 +119,7 @@ export default function BudgetControl({ client }: { client: Client }) {
     return dups;
   })();
 
-  const hasIncomplete = rows.some((r) => !r.subReportName || !r.channel || !r.amount);
+  const hasIncomplete = rows.some((r) => !r.subReportId || !r.channel || !r.amount);
   const canSave = rows.length > 0 && duplicateKeys.size === 0 && !hasIncomplete;
 
   async function handleSave() {
@@ -140,7 +128,7 @@ export default function BudgetControl({ client }: { client: Client }) {
     try {
       const [year, month] = monthValue.split("-").map(Number);
       const entries = rows.map((r) => ({
-        subReportId: resolveSubReportId(r.subReportName, r.channel),
+        subReportId: r.subReportId === TOTAL_SENTINEL ? null : r.subReportId,
         channel: r.channel,
         amount: Number(r.amount) || 0,
       }));
@@ -159,8 +147,6 @@ export default function BudgetControl({ client }: { client: Client }) {
       setSaving(false);
     }
   }
-
-  const subReportNames = data ? Array.from(new Set(data.subReports.map((sr) => sr.name))) : [];
 
   const channelGroups = data ? groupByChannel(data.entries) : [];
   // Com dois ou mais canais, cada um vira uma coluna (lg+) e os cards ficam 2 por linha
@@ -264,13 +250,13 @@ export default function BudgetControl({ client }: { client: Client }) {
                 }`}
               >
                 <select
-                  value={row.subReportName}
-                  onChange={(e) => updateRow(row.key, { subReportName: e.target.value, channel: "" })}
+                  value={row.subReportId}
+                  onChange={(e) => updateRow(row.key, { subReportId: e.target.value })}
                   className="h-9 px-2.5 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition min-w-[160px]"
                 >
                   <option value="">Sub-relatório...</option>
-                  {subReportNames.map((n) => (
-                    <option key={n} value={n}>{n}</option>
+                  {(data?.subReports ?? []).map((sr) => (
+                    <option key={sr.id} value={sr.id}>{sr.name}</option>
                   ))}
                   <option value={TOTAL_SENTINEL}>Total (sem sub-relatório)</option>
                 </select>
@@ -278,11 +264,11 @@ export default function BudgetControl({ client }: { client: Client }) {
                 <select
                   value={row.channel}
                   onChange={(e) => updateRow(row.key, { channel: e.target.value })}
-                  disabled={!row.subReportName}
+                  disabled={!row.subReportId}
                   className="h-9 px-2.5 border border-slate-300 rounded-lg text-sm text-[#333333] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:opacity-50 min-w-[110px]"
                 >
                   <option value="">Canal...</option>
-                  {channelsForName(row.subReportName).map((c) => (
+                  {(data?.availableChannels ?? []).map((c) => (
                     <option key={c} value={c}>{channelLabel(c)}</option>
                   ))}
                 </select>

@@ -1,16 +1,9 @@
 "use client";
 
 import { useState } from "react";
-
-export interface SubReport {
-  id: string;
-  clientId: string;
-  channel: string;
-  name: string;
-  campaignIds: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+import type { SubReport } from "@/lib/sub-reports";
+import { totalCampaignCount } from "@/lib/sub-reports";
+import CampaignChannelPicker from "./CampaignChannelPicker";
 
 interface Campaign {
   id: string;
@@ -19,26 +12,42 @@ interface Campaign {
 
 interface Props {
   clientId: string;
+  /** Canal da aba de onde o modal foi aberto — só semeia a seleção inicial. */
   channel: string;
+  /** Campanhas já selecionadas naquela aba, usadas como seleção inicial. */
   campaigns: Campaign[];
+  knownCampaignsByChannel?: Record<string, Campaign[]>;
   onCreated: (subReport: SubReport) => void;
   onCancel: () => void;
 }
 
-export default function CreateSubReportModal({ clientId, channel, campaigns, onCreated, onCancel }: Props) {
+export default function CreateSubReportModal({
+  clientId,
+  channel,
+  campaigns,
+  knownCampaignsByChannel,
+  onCreated,
+  onCancel,
+}: Props) {
   const [name, setName] = useState("");
+  const [campaignsByChannel, setCampaignsByChannel] = useState<Record<string, string[]>>({
+    [channel]: campaigns.map((c) => c.id),
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const total = totalCampaignCount(campaignsByChannel);
+
   async function handleCreate() {
     if (!name.trim()) { setError("Informe um nome para o sub-relatório."); return; }
+    if (total === 0) { setError("Selecione ao menos uma campanha."); return; }
     setSaving(true);
     setError("");
     try {
       const res = await fetch(`/api/clients/${clientId}/sub-reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), channel, campaignIds: campaigns.map((c) => c.id) }),
+        body: JSON.stringify({ name: name.trim(), campaignsByChannel }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erro ao criar");
@@ -52,48 +61,45 @@ export default function CreateSubReportModal({ clientId, channel, campaigns, onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5">
-        <div>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
           <h2 className="text-lg font-bold text-slate-900">Gerar Sub-relatório</h2>
           <p className="text-sm text-slate-500 mt-0.5">
-            Salva a seleção atual de campanhas como um filtro reutilizável.
+            Um sub-relatório é comum aos canais — vincule campanhas de Google e de Meta ao mesmo nome.
           </p>
         </div>
 
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
-        )}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+          )}
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Nome do sub-relatório</label>
-          <input
-            autoFocus
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            placeholder="Ex: Campanhas de Conversão"
-            className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-[#333333] focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nome do sub-relatório</label>
+            <input
+              autoFocus
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Campanhas de Conversão"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-[#333333] focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+          </div>
 
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-            Campanhas incluídas ({campaigns.length})
-          </p>
-          <div className="max-h-40 overflow-y-auto space-y-1 border border-slate-100 rounded-lg p-2">
-            {campaigns.map((c) => (
-              <div key={c.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded-lg">
-                <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-xs text-slate-700 truncate">{c.name}</span>
-              </div>
-            ))}
+          <div>
+            <p className="text-sm font-medium text-slate-700 mb-2">
+              Campanhas vinculadas <span className="text-slate-400">({total})</span>
+            </p>
+            <CampaignChannelPicker
+              clientId={clientId}
+              value={campaignsByChannel}
+              onChange={setCampaignsByChannel}
+              knownCampaignsByChannel={knownCampaignsByChannel}
+            />
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
           <button
             onClick={onCancel}
             disabled={saving}
@@ -103,7 +109,7 @@ export default function CreateSubReportModal({ clientId, channel, campaigns, onC
           </button>
           <button
             onClick={handleCreate}
-            disabled={saving || !name.trim()}
+            disabled={saving || !name.trim() || total === 0}
             className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
           >
             {saving ? "Criando..." : "Criar Sub-relatório"}

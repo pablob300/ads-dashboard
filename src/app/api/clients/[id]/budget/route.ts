@@ -3,12 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { fetchCampaignData } from "@/lib/google-ads-campaigns";
 import { fetchMetaCampaignData } from "@/lib/meta-ads-campaigns";
 import {
-  channelLabel,
-  grossUpMetaSpend,
   monthRange,
   type BudgetEntryRow,
   type GetBudgetResponse,
 } from "@/lib/budget";
+import { CHANNEL_KEYS, channelLabel, grossUpSpend } from "@/lib/channels";
+import { groupCampaignsByChannel } from "@/lib/sub-reports";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 
@@ -43,6 +43,7 @@ export async function GET(
   const subReportsRaw = await prisma.subReport.findMany({
     where: { clientId },
     orderBy: { createdAt: "asc" },
+    include: { campaigns: true },
   });
 
   const savedEntries = await prisma.budgetEntry.findMany({
@@ -123,7 +124,9 @@ export async function GET(
 
     if (e.subReportId) {
       const sr = subReportsRaw.find((s) => s.id === e.subReportId);
-      campaignIds = sr?.campaignIds ?? [];
+      // O sub-relatório é comum aos canais; esta verba é de um canal só, então
+      // conta apenas as campanhas daquele canal.
+      campaignIds = sr ? groupCampaignsByChannel(sr.campaigns)[e.channel] ?? [] : [];
       name = sr?.name ?? "(sub-relatório removido)";
     } else {
       campaignIds = map ? Array.from(map.keys()) : [];
@@ -133,8 +136,7 @@ export async function GET(
     let spent = 0;
     if (map) {
       for (const id of campaignIds) {
-        const raw = map.get(id)?.raw ?? 0;
-        spent += e.channel === "meta" ? grossUpMetaSpend(raw) : raw;
+        spent += grossUpSpend(map.get(id)?.raw ?? 0, e.channel);
       }
     }
 
@@ -144,7 +146,7 @@ export async function GET(
   const response: GetBudgetResponse = {
     year,
     month,
-    subReports: subReportsRaw.map((sr) => ({ id: sr.id, name: sr.name, channel: sr.channel })),
+    subReports: subReportsRaw.map((sr) => ({ id: sr.id, name: sr.name })),
     availableChannels,
     entries,
     errors,
@@ -154,7 +156,7 @@ export async function GET(
 
 const entrySchema = z.object({
   subReportId: z.string().nullable(),
-  channel: z.string().min(1),
+  channel: z.enum(CHANNEL_KEYS as [string, ...string[]]),
   amount: z.number().min(0),
 });
 

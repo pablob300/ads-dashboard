@@ -1,20 +1,6 @@
-// Meta reporta o gasto de campanhas sem o imposto de 12,15% que incide sobre a verba.
-// Para chegar no valor efetivo gasto, divide-se o gasto bruto por 0,8785 (= 1 - 0,1215).
-// Único lugar do código onde esse ajuste deve acontecer.
-export const META_TAX_GROSS_UP_DIVISOR = 0.8785;
-
-export function grossUpMetaSpend(rawSpend: number): number {
-  return rawSpend / META_TAX_GROSS_UP_DIVISOR;
-}
-
-export const CHANNEL_LABELS: Record<string, string> = {
-  google: "Google",
-  meta: "Meta",
-};
-
-export function channelLabel(channel: string): string {
-  return CHANNEL_LABELS[channel] ?? channel;
-}
+// Canais (rótulo, imposto, ordem) moram em ./channels — re-exportados aqui
+// porque os componentes de orçamento já importam `channelLabel` deste módulo.
+export { channelLabel, grossUpSpend } from "./channels";
 
 /** Intervalo de datas de um mês fechado (ou até hoje, se for o mês corrente ainda em andamento) */
 export function monthRange(year: number, month: number): { start: Date; end: Date } {
@@ -28,11 +14,14 @@ export function monthRange(year: number, month: number): { start: Date; end: Dat
 /** Sentinela usado no formulário para representar "Total (sem sub-relatório)" — vira subReportId: null */
 export const TOTAL_SENTINEL = "__total__";
 
-/** Opção crua de sub-relatório, usada para montar os selects do formulário */
+/**
+ * Opção de sub-relatório para o select do formulário.
+ * Sem canal: o sub-relatório é comum a todos os canais, e o canal da verba é
+ * escolhido separadamente.
+ */
 export interface SubReportOption {
   id: string;
   name: string;
-  channel: string;
 }
 
 /** Uma verba já salva para o mês, com o gasto real já resolvido (e com o imposto do Meta já aplicado) */

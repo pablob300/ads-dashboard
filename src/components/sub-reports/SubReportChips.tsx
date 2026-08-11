@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { SubReport } from "./CreateSubReportModal";
+import type { SubReport } from "@/lib/sub-reports";
 
 interface Props {
   subReports: SubReport[];

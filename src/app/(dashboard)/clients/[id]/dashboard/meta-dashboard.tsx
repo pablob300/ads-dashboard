@@ -12,8 +12,9 @@ import { useToast } from "@/components/toast";
 import MonthYearPicker from "@/components/sub-reports/MonthYearPicker";
 import SubReportChips from "@/components/sub-reports/SubReportChips";
 import FunnelMetrics from "@/components/sub-reports/FunnelMetrics";
-import CreateSubReportModal, { type SubReport } from "@/components/sub-reports/CreateSubReportModal";
+import CreateSubReportModal from "@/components/sub-reports/CreateSubReportModal";
 import EditSubReportModal from "@/components/sub-reports/EditSubReportModal";
+import { campaignIdsFor, type SubReport } from "@/lib/sub-reports";
 
 interface MetaAccount {
   id: string;
@@ -76,7 +77,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
 
   // Carrega sub-relatórios ao montar
   useEffect(() => {
-    fetch(`/api/clients/${client.id}/sub-reports?channel=meta`)
+    fetch(`/api/clients/${client.id}/sub-reports`)
       .then((r) => r.json())
       .then((d) => setSubReports(d.subReports ?? []))
       .catch(() => {});
@@ -88,7 +89,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
     const found = subReports.find((sr) => sr.id === urlSub);
     if (found) {
       setActiveSubReport(found);
-      setSelectedCampaigns(new Set(found.campaignIds));
+      setSelectedCampaigns(new Set(campaignIdsFor(found, "meta")));
     }
   }, [data, urlSub, urlTab, subReports]);
 
@@ -127,7 +128,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
   }, [data, search]);
 
   const effectiveCampaigns = useMemo(
-    () => (activeSubReport ? new Set(activeSubReport.campaignIds) : selectedCampaigns),
+    () => (activeSubReport ? new Set(campaignIdsFor(activeSubReport, "meta")) : selectedCampaigns),
     [activeSubReport, selectedCampaigns]
   );
 
@@ -184,7 +185,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
   function handleSelectSubReport(sr: SubReport | null) {
     setActiveSubReport(sr);
     if (sr) {
-      setSelectedCampaigns(new Set(sr.campaignIds));
+      setSelectedCampaigns(new Set(campaignIdsFor(sr, "meta")));
       router.push(`${pathname}?tab=meta&sub=${sr.id}`);
     } else {
       setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
@@ -203,7 +204,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
   function handleSubReportCreated(sr: SubReport) {
     setSubReports((prev) => [...prev, sr]);
     setActiveSubReport(sr);
-    setSelectedCampaigns(new Set(sr.campaignIds));
+    setSelectedCampaigns(new Set(campaignIdsFor(sr, "meta")));
     setShowCreateModal(false);
     addToast(`Sub-relatório "${sr.name}" criado!`, "success");
   }
@@ -212,7 +213,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
     setSubReports((prev) => prev.map((r) => (r.id === sr.id ? sr : r)));
     if (activeSubReport?.id === sr.id) {
       setActiveSubReport(sr);
-      setSelectedCampaigns(new Set(sr.campaignIds));
+      setSelectedCampaigns(new Set(campaignIdsFor(sr, "meta")));
     }
     setEditingSubReport(null);
     addToast(`Sub-relatório "${sr.name}" atualizado!`, "success");
@@ -483,6 +484,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
           clientId={client.id}
           channel="meta"
           campaigns={pendingCampaigns}
+          knownCampaignsByChannel={{ meta: data?.campaigns ?? [] }}
           onCreated={handleSubReportCreated}
           onCancel={() => setShowCreateModal(false)}
         />
@@ -491,8 +493,7 @@ export default function MetaDashboard({ client }: { client: Client }) {
         <EditSubReportModal
           clientId={client.id}
           subReport={editingSubReport}
-          channel="meta"
-          knownCampaigns={data?.campaigns}
+          knownCampaignsByChannel={{ meta: data?.campaigns ?? [] }}
           onUpdated={handleSubReportUpdated}
           onDeleted={handleSubReportDeleted}
           onCancel={() => setEditingSubReport(null)}

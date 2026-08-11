@@ -10,7 +10,7 @@ import type { MetaCampaignData, MetaCampaignMetric } from "@/lib/meta-ads-campai
 import MonthYearPicker from "@/components/sub-reports/MonthYearPicker";
 import SubReportChips from "@/components/sub-reports/SubReportChips";
 import FunnelMetrics from "@/components/sub-reports/FunnelMetrics";
-import type { SubReport } from "@/components/sub-reports/CreateSubReportModal";
+import { campaignIdsFor, type SubReport } from "@/lib/sub-reports";
 
 interface Client {
   id: string;
@@ -99,7 +99,7 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
   const [activeSubReport, setActiveSubReport] = useState<SubReport | null>(null);
 
   useEffect(() => {
-    fetch(`/api/share/${token}/sub-reports?channel=google`)
+    fetch(`/api/share/${token}/sub-reports`)
       .then((r) => r.json()).then((d) => setSubReports(d.subReports ?? [])).catch(() => {});
   }, [token]);
 
@@ -129,7 +129,7 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
   }, [data, search]);
 
   const effectiveCampaigns = useMemo(
-    () => (activeSubReport ? new Set(activeSubReport.campaignIds) : selectedCampaigns),
+    () => (activeSubReport ? new Set(campaignIdsFor(activeSubReport, "google")) : selectedCampaigns),
     [activeSubReport, selectedCampaigns]
   );
 
@@ -163,7 +163,7 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
 
   function handleSelectSubReport(sr: SubReport | null) {
     setActiveSubReport(sr);
-    setSelectedCampaigns(sr ? new Set(sr.campaignIds) : new Set(data?.campaigns.map((c) => c.id) ?? []));
+    setSelectedCampaigns(sr ? new Set(campaignIdsFor(sr, "google")) : new Set(data?.campaigns.map((c) => c.id) ?? []));
   }
 
   return (
@@ -333,7 +333,7 @@ function MetaTab({ client, token }: { client: Client; token: string }) {
   const [activeSubReport, setActiveSubReport] = useState<SubReport | null>(null);
 
   useEffect(() => {
-    fetch(`/api/share/${token}/sub-reports?channel=meta`)
+    fetch(`/api/share/${token}/sub-reports`)
       .then((r) => r.json()).then((d) => setSubReports(d.subReports ?? [])).catch(() => {});
   }, [token]);
 
@@ -362,7 +362,7 @@ function MetaTab({ client, token }: { client: Client; token: string }) {
   }, [data, search]);
 
   const effectiveCampaigns = useMemo(
-    () => (activeSubReport ? new Set(activeSubReport.campaignIds) : selectedCampaigns),
+    () => (activeSubReport ? new Set(campaignIdsFor(activeSubReport, "meta")) : selectedCampaigns),
     [activeSubReport, selectedCampaigns]
   );
 
@@ -396,7 +396,7 @@ function MetaTab({ client, token }: { client: Client; token: string }) {
 
   function handleSelectSubReport(sr: SubReport | null) {
     setActiveSubReport(sr);
-    setSelectedCampaigns(sr ? new Set(sr.campaignIds) : new Set(data?.campaigns.map((c) => c.id) ?? []));
+    setSelectedCampaigns(sr ? new Set(campaignIdsFor(sr, "meta")) : new Set(data?.campaigns.map((c) => c.id) ?? []));
   }
 
   return (

@@ -14,8 +14,9 @@ import ShareModal from "@/components/ShareModal";
 import MonthYearPicker from "@/components/sub-reports/MonthYearPicker";
 import SubReportChips from "@/components/sub-reports/SubReportChips";
 import FunnelMetrics from "@/components/sub-reports/FunnelMetrics";
-import CreateSubReportModal, { type SubReport } from "@/components/sub-reports/CreateSubReportModal";
+import CreateSubReportModal from "@/components/sub-reports/CreateSubReportModal";
 import EditSubReportModal from "@/components/sub-reports/EditSubReportModal";
+import { campaignIdsFor, type SubReport } from "@/lib/sub-reports";
 import { ClientBalanceTooltip } from "@/components/ClientBalanceTooltip";
 
 // ── tipos ──────────────────────────────────────────────────────────────────
@@ -99,9 +100,10 @@ export default function ClientDashboard({ client }: { client: Client }) {
     }
   }
 
-  // Carrega sub-relatórios ao montar
+  // Carrega sub-relatórios ao montar. Sem filtro de canal: o sub-relatório é
+  // comum aos canais, então as duas abas listam os mesmos.
   useEffect(() => {
-    fetch(`/api/clients/${client.id}/sub-reports?channel=google`)
+    fetch(`/api/clients/${client.id}/sub-reports`)
       .then((r) => r.json())
       .then((d) => setSubReports(d.subReports ?? []))
       .catch(() => {});
@@ -113,7 +115,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
     const found = subReports.find((sr) => sr.id === urlSub);
     if (found) {
       setActiveSubReport(found);
-      setSelectedCampaigns(new Set(found.campaignIds));
+      setSelectedCampaigns(new Set(campaignIdsFor(found, "google")));
     }
   }, [data, urlSub, urlTab, subReports]);
 
@@ -157,7 +159,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
   // Quando sub-relatório está ativo, usa os IDs dele como fonte de verdade,
   // ignorando qualquer dessincronia de selectedCampaigns.
   const effectiveCampaigns = useMemo(
-    () => (activeSubReport ? new Set(activeSubReport.campaignIds) : selectedCampaigns),
+    () => (activeSubReport ? new Set(campaignIdsFor(activeSubReport, "google")) : selectedCampaigns),
     [activeSubReport, selectedCampaigns]
   );
 
@@ -214,7 +216,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
   function handleSelectSubReport(sr: SubReport | null) {
     setActiveSubReport(sr);
     if (sr) {
-      setSelectedCampaigns(new Set(sr.campaignIds));
+      setSelectedCampaigns(new Set(campaignIdsFor(sr, "google")));
       router.push(`${pathname}?tab=google&sub=${sr.id}`);
     } else {
       setSelectedCampaigns(new Set(data?.campaigns.map((c) => c.id) ?? []));
@@ -233,7 +235,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
   function handleSubReportCreated(sr: SubReport) {
     setSubReports((prev) => [...prev, sr]);
     setActiveSubReport(sr);
-    setSelectedCampaigns(new Set(sr.campaignIds));
+    setSelectedCampaigns(new Set(campaignIdsFor(sr, "google")));
     setShowCreateModal(false);
     addToast(`Sub-relatório "${sr.name}" criado!`, "success");
   }
@@ -242,7 +244,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
     setSubReports((prev) => prev.map((r) => (r.id === sr.id ? sr : r)));
     if (activeSubReport?.id === sr.id) {
       setActiveSubReport(sr);
-      setSelectedCampaigns(new Set(sr.campaignIds));
+      setSelectedCampaigns(new Set(campaignIdsFor(sr, "google")));
     }
     setEditingSubReport(null);
     addToast(`Sub-relatório "${sr.name}" atualizado!`, "success");
@@ -642,6 +644,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
           clientId={client.id}
           channel="google"
           campaigns={pendingCampaigns}
+          knownCampaignsByChannel={{ google: data?.campaigns ?? [] }}
           onCreated={handleSubReportCreated}
           onCancel={() => setShowCreateModal(false)}
         />
@@ -650,8 +653,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
         <EditSubReportModal
           clientId={client.id}
           subReport={editingSubReport}
-          channel="google"
-          knownCampaigns={data?.campaigns}
+          knownCampaignsByChannel={{ google: data?.campaigns ?? [] }}
           onUpdated={handleSubReportUpdated}
           onDeleted={handleSubReportDeleted}
           onCancel={() => setEditingSubReport(null)}

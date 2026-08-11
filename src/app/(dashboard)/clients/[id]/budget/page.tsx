@@ -19,7 +19,7 @@ const MIGRATION_SQL = `CREATE TABLE "budget_entries" (
 
 CREATE INDEX "budget_entries_clientId_year_month_idx" ON "budget_entries"("clientId", "year", "month");
 
-CREATE UNIQUE INDEX "budget_entries_clientId_subReportId_year_month_key" ON "budget_entries"("clientId", "subReportId", "year", "month");
+CREATE UNIQUE INDEX "budget_entries_clientId_subReportId_channel_year_month_key" ON "budget_entries"("clientId", "subReportId", "channel", "year", "month");
 
 ALTER TABLE "budget_entries" ADD CONSTRAINT "budget_entries_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
