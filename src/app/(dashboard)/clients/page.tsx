@@ -15,6 +15,9 @@ export default async function ClientsPage() {
           googleAdAccounts: {
             select: { id: true, customerId: true, descriptiveName: true, alias: true, isManagerAccount: true },
           },
+          metaAdAccounts: {
+            select: { id: true, accountId: true, name: true, alias: true },
+          },
         },
         orderBy: { createdAt: "desc" },
       })
@@ -74,29 +77,54 @@ export default async function ClientsPage() {
                   )}
                 </div>
                 <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded-full shrink-0">
-                  {client.googleAdAccounts.length} conta{client.googleAdAccounts.length !== 1 ? "s" : ""}
+                  {client.googleAdAccounts.length + client.metaAdAccounts.length} conta
+                  {client.googleAdAccounts.length + client.metaAdAccounts.length !== 1 ? "s" : ""}
                 </span>
               </div>
 
               <div className="space-y-1.5">
-                {client.googleAdAccounts.slice(0, 3).map((acc) => (
-                  <div key={acc.id} className="flex items-center gap-2">
-                    <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span className="text-xs text-slate-600 truncate">
-                      {acc.alias || (!acc.descriptiveName.startsWith("Conta ") ? acc.descriptiveName : formatCustomerId(acc.customerId))}
-                    </span>
-                    {acc.isManagerAccount && (
-                      <span className="text-xs bg-purple-100 text-purple-600 px-1 rounded shrink-0">MCC</span>
-                    )}
-                  </div>
-                ))}
-                {client.googleAdAccounts.length > 3 && (
-                  <p className="text-xs text-slate-400 pl-5">
-                    +{client.googleAdAccounts.length - 3} mais
-                  </p>
-                )}
+                {(() => {
+                  // Um cliente pode ter só Google, só Meta ou os dois — listar os dois canais.
+                  const accounts = [
+                    ...client.googleAdAccounts.map((acc) => ({
+                      id: acc.id,
+                      channel: "Google",
+                      isManagerAccount: acc.isManagerAccount,
+                      label:
+                        acc.alias ||
+                        (!acc.descriptiveName.startsWith("Conta ")
+                          ? acc.descriptiveName
+                          : formatCustomerId(acc.customerId)),
+                    })),
+                    ...client.metaAdAccounts.map((acc) => ({
+                      id: acc.id,
+                      channel: "Meta",
+                      isManagerAccount: false,
+                      label: acc.alias || acc.name,
+                    })),
+                  ];
+                  return (
+                    <>
+                      {accounts.slice(0, 3).map((acc) => (
+                        <div key={acc.id} className="flex items-center gap-2">
+                          <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          <span className="text-xs text-slate-600 truncate">{acc.label}</span>
+                          <span className="text-xs bg-slate-100 text-slate-500 px-1 rounded shrink-0">{acc.channel}</span>
+                          {acc.isManagerAccount && (
+                            <span className="text-xs bg-purple-100 text-purple-600 px-1 rounded shrink-0">MCC</span>
+                          )}
+                        </div>
+                      ))}
+                      {accounts.length > 3 && (
+                        <p className="text-xs text-slate-400 pl-5">
+                          +{accounts.length - 3} mais
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex gap-2">

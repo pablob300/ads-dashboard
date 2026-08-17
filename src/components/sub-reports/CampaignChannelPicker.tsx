@@ -19,6 +19,11 @@ interface Props {
    * já vinculada nunca suma da lista se o endpoint /all daquele canal falhar.
    */
   knownCampaignsByChannel?: Record<string, Campaign[]>;
+  /**
+   * Canais que o cliente realmente tem conta vinculada. Sem isso um cliente só-Meta
+   * veria uma seção "Google" permanentemente vazia. Default: todos os canais.
+   */
+  channels?: string[];
 }
 
 export default function CampaignChannelPicker({
@@ -26,7 +31,16 @@ export default function CampaignChannelPicker({
   value,
   onChange,
   knownCampaignsByChannel,
+  channels,
 }: Props) {
+  // Ancorado numa string, não no array: o pai passa um literal novo a cada render e
+  // `visibleChannels` alimenta o useEffect de fetch — comparar por identidade daria loop.
+  const channelsKey = channels ? channels.join(",") : "";
+  const visibleChannels = useMemo(() => {
+    if (!channelsKey) return CHANNELS;
+    const allowed = channelsKey.split(",");
+    return CHANNELS.filter((c) => allowed.includes(c.key));
+  }, [channelsKey]);
   const [allByChannel, setAllByChannel] = useState<Record<string, Campaign[]>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(CHANNELS.map((c) => [c.key, true]))
@@ -34,10 +48,10 @@ export default function CampaignChannelPicker({
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
 
-  // Busca as campanhas de TODOS os canais — o sub-relatório é comum a eles.
+  // Busca as campanhas de todos os canais visíveis — o sub-relatório é comum a eles.
   useEffect(() => {
     let cancelled = false;
-    for (const channel of CHANNELS) {
+    for (const channel of visibleChannels) {
       fetch(channel.allCampaignsPath(clientId))
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
         .then((data) => {
@@ -56,20 +70,20 @@ export default function CampaignChannelPicker({
     return () => {
       cancelled = true;
     };
-  }, [clientId]);
+  }, [clientId, visibleChannels]);
 
   // União das duas fontes por canal: o /all é a lista completa, o known cobre o
   // caso de ele falhar. Sem isso, o canal da aba inativa ficaria sem opções.
   const mergedByChannel = useMemo(() => {
     const merged: Record<string, Campaign[]> = {};
-    for (const channel of CHANNELS) {
+    for (const channel of visibleChannels) {
       const map = new Map<string, Campaign>();
       for (const c of knownCampaignsByChannel?.[channel.key] ?? []) map.set(c.id, c);
       for (const c of allByChannel[channel.key] ?? []) map.set(c.id, c);
       merged[channel.key] = Array.from(map.values());
     }
     return merged;
-  }, [allByChannel, knownCampaignsByChannel]);
+  }, [allByChannel, knownCampaignsByChannel, visibleChannels]);
 
   function toggle(channel: string, campaignId: string) {
     const current = new Set(value[channel] ?? []);
@@ -90,7 +104,7 @@ export default function CampaignChannelPicker({
         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-[#333333] focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
 
-      {CHANNELS.map((channel) => {
+      {visibleChannels.map((channel) => {
         const selectedIds = new Set(value[channel.key] ?? []);
         const campaigns = mergedByChannel[channel.key] ?? [];
         const selected = campaigns.filter((c) => selectedIds.has(c.id) && c.name.toLowerCase().includes(q));

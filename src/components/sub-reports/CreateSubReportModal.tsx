@@ -17,6 +17,8 @@ interface Props {
   /** Campanhas já selecionadas naquela aba, usadas como seleção inicial. */
   campaigns: Campaign[];
   knownCampaignsByChannel?: Record<string, Campaign[]>;
+  /** Canais com conta vinculada no cliente. Default do picker: todos. */
+  channels?: string[];
   onCreated: (subReport: SubReport) => void;
   onCancel: () => void;
 }
@@ -26,6 +28,7 @@ export default function CreateSubReportModal({
   channel,
   campaigns,
   knownCampaignsByChannel,
+  channels,
   onCreated,
   onCancel,
 }: Props) {
@@ -95,6 +98,7 @@ export default function CreateSubReportModal({
               value={campaignsByChannel}
               onChange={setCampaignsByChannel}
               knownCampaignsByChannel={knownCampaignsByChannel}
+              channels={channels}
             />
           </div>
         </div>

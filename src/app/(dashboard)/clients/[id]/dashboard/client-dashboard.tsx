@@ -32,7 +32,7 @@ type MetricKey = "costBRL" | "conversions" | "impressions" | "clicks";
 
 const METRICS: { key: MetricKey; label: string; color: string; yAxisId: string }[] = [
   { key: "costBRL",     label: "Valor Gasto",  color: "#3B82F6", yAxisId: "money"  },
-  { key: "conversions", label: "Conversões",   color: "#10B981", yAxisId: "small"  },
+  { key: "conversions", label: "Resultados",   color: "#10B981", yAxisId: "small"  },
   { key: "clicks",      label: "Cliques",      color: "#F59E0B", yAxisId: "volume" },
   { key: "impressions", label: "Impressões",   color: "#8B5CF6", yAxisId: "volume" },
 ];
@@ -57,7 +57,20 @@ export default function ClientDashboard({ client }: { client: Client }) {
   const urlTab = searchParams.get("tab");
   const urlSub = searchParams.get("sub");
 
-  const [activeTab, setActiveTab] = useState<Tab>(urlTab === "meta" ? "meta" : "google");
+  // O cliente não tem uma coluna de "canais": o canal existe se houver conta vinculada.
+  const hasGoogle = client.googleAdAccounts.length > 0;
+  const hasMeta = client.metaAdAccounts.length > 0;
+  const availableChannels = useMemo(
+    () => [...(hasGoogle ? ["google"] : []), ...(hasMeta ? ["meta"] : [])],
+    [hasGoogle, hasMeta]
+  );
+
+  // Respeita o ?tab= só se aquele canal existir; senão cai no primeiro disponível.
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (urlTab === "meta" && hasMeta) return "meta";
+    if (urlTab === "google" && hasGoogle) return "google";
+    return hasGoogle ? "google" : "meta";
+  });
   const init = useMemo(() => defaultRange(), []);
   const [startDate, setStartDate] = useState(init.start);
   const [endDate, setEndDate] = useState(init.end);
@@ -111,17 +124,21 @@ export default function ClientDashboard({ client }: { client: Client }) {
 
   // Ativa sub-relatório a partir da URL (Google)
   useEffect(() => {
-    if (!urlSub || urlTab === "meta" || !subReports.length || !data) return;
+    // Usa activeTab, não urlTab: num cliente só-Meta a URL não traz ?tab= e este
+    // efeito (que é do Google) rodaria indevidamente.
+    if (!urlSub || activeTab === "meta" || !subReports.length || !data) return;
     const found = subReports.find((sr) => sr.id === urlSub);
     if (found) {
       setActiveSubReport(found);
       setSelectedCampaigns(new Set(campaignIdsFor(found, "google")));
     }
-  }, [data, urlSub, urlTab, subReports]);
+  }, [data, urlSub, activeTab, subReports]);
 
   // ── busca dados ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async (start: string, end: string) => {
     if (!start || !end || start > end) return;
+    // Sem conta Google não há o que buscar — evita uma chamada vazia por render.
+    if (!hasGoogle) { setLoading(false); return; }
     setLoading(true);
     try {
       const res = await fetch(`/api/clients/${client.id}/campaigns?startDate=${start}&endDate=${end}`);
@@ -136,7 +153,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
     } finally {
       setLoading(false);
     }
-  }, [client.id, addToast]);
+  }, [client.id, addToast, hasGoogle]);
 
   useEffect(() => { fetchData(startDate, endDate); }, [startDate, endDate, fetchData]);
 
@@ -302,8 +319,24 @@ export default function ClientDashboard({ client }: { client: Client }) {
         </button>
       </div>
 
-      {/* Abas */}
-      <div className="flex gap-1 border-b border-slate-200">
+      {/* Sem nenhum canal vinculado não há o que mostrar */}
+      {!hasGoogle && !hasMeta && (
+        <div className="bg-white border border-dashed border-slate-300 rounded-xl p-12 text-center">
+          <h3 className="font-semibold text-slate-700 mb-1">Nenhuma conta de anúncio vinculada</h3>
+          <p className="text-slate-500 text-sm mb-4">
+            Vincule uma conta do Google Ads ou do Meta Ads para ver as métricas deste cliente.
+          </p>
+          <Link
+            href={`/clients/${client.id}/edit`}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+          >
+            Vincular contas
+          </Link>
+        </div>
+      )}
+
+      {/* Abas — só o canal que o cliente realmente tem */}
+      <div className={`flex gap-1 border-b border-slate-200 ${!hasGoogle && !hasMeta ? "hidden" : ""}`}>
         {[
           { key: "google" as Tab, label: "Google Ads", activeColor: "border-blue-600 text-blue-600", icon: (
             <svg viewBox="0 0 48 48" className="w-4 h-4 shrink-0"><path fill="#4285F4" d="M43.6 20.5H24v7h11.3c-1.6 5.1-6.4 8.5-11.3 8.5-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.3-5.3C33.6 6.5 29 4.5 24 4.5 13.3 4.5 4.5 13.3 4.5 24S13.3 43.5 24 43.5c10.8 0 20-8 20-19.5 0-1.2-.1-2-.4-3.5z"/></svg>
@@ -311,7 +344,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
           { key: "meta" as Tab, label: "Meta Ads", activeColor: "border-[#1877F2] text-[#1877F2]", icon: (
             <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill={activeTab === "meta" ? "#1877F2" : "#94a3b8"}><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
           )},
-        ].map((tab) => (
+        ].filter((tab) => (tab.key === "google" ? hasGoogle : hasMeta)).map((tab) => (
           <button key={tab.key} onClick={() => { setActiveTab(tab.key); router.push(`${pathname}?tab=${tab.key}`); }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition -mb-px ${activeTab === tab.key ? tab.activeColor : "border-transparent text-slate-500 hover:text-slate-700"}`}
           >
@@ -320,9 +353,9 @@ export default function ClientDashboard({ client }: { client: Client }) {
         ))}
       </div>
 
-      {activeTab === "meta" && <MetaDashboard client={client} />}
+      {activeTab === "meta" && hasMeta && <MetaDashboard client={client} channels={availableChannels} />}
 
-      {activeTab === "google" && <>
+      {activeTab === "google" && hasGoogle && <>
 
         {/* Filtros */}
         <div className="flex flex-wrap items-center gap-3">
@@ -448,7 +481,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
                 { label: "Valor Gasto",  value: fmtBRL(totals.costBRL),    color: "text-blue-600"   },
-                { label: "Conversões",   value: fmtNum(totals.conversions), color: "text-emerald-600"},
+                { label: "Resultados",   value: fmtNum(totals.conversions), color: "text-emerald-600"},
                 { label: "Cliques",      value: fmtNum(totals.clicks),      color: "text-amber-600"  },
                 { label: "Impressões",   value: fmtNum(totals.impressions), color: "text-purple-600" },
                 { label: "CTR",          value: fmtPct(totals.ctr),         color: "text-slate-700"  },
@@ -591,7 +624,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
-                      {["Campanha", "Valor Investido", "Impressões", "Cliques", "Conversões", "CTR", "Custo/Conv."].map((h) => (
+                      {["Campanha", "Valor Investido", "Impressões", "Cliques", "Resultados", "CTR", "Custo/Result."].map((h) => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -645,6 +678,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
           channel="google"
           campaigns={pendingCampaigns}
           knownCampaignsByChannel={{ google: data?.campaigns ?? [] }}
+          channels={availableChannels}
           onCreated={handleSubReportCreated}
           onCancel={() => setShowCreateModal(false)}
         />
@@ -654,6 +688,7 @@ export default function ClientDashboard({ client }: { client: Client }) {
           clientId={client.id}
           subReport={editingSubReport}
           knownCampaignsByChannel={{ google: data?.campaigns ?? [] }}
+          channels={availableChannels}
           onUpdated={handleSubReportUpdated}
           onDeleted={handleSubReportDeleted}
           onCancel={() => setEditingSubReport(null)}

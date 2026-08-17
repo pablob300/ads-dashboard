@@ -23,15 +23,21 @@ const h2 = (2 * H) / 3;  // 173.33 — second band separator
 const xl = (y: number) => (cx * y) / H;
 const xr = (y: number) => W - (cx * y) / H;
 
-const SECTIONS = [
-  { label: "Impressões", fill: "#8B5CF6" },
-  { label: "Cliques",    fill: "#F59E0B" },
-  { label: "Conversões", fill: "#10B981" },
-];
-
-export default function FunnelMetrics({ totals }: { totals: Totals }) {
+export default function FunnelMetrics({
+  totals,
+  conversionLabel = "Resultados",
+}: {
+  totals: Totals;
+  /** Rótulo da terceira banda. O componente é usado pelas abas Google e Meta. */
+  conversionLabel?: string;
+}) {
   const top = totals.impressions || 1;
   const values = [totals.impressions, totals.clicks, totals.conversions];
+  const sections = [
+    { label: "Impressões",    fill: "#8B5CF6" },
+    { label: "Cliques",       fill: "#F59E0B" },
+    { label: conversionLabel, fill: "#10B981" },
+  ];
 
   return (
     <div className="flex flex-col h-full">
@@ -49,7 +55,7 @@ export default function FunnelMetrics({ totals }: { totals: Totals }) {
             points={`${xl(h1)},${h1} ${xr(h1)},${h1} ${xr(h2)},${h2} ${xl(h2)},${h2}`}
             fill="#F59E0B"
           />
-          {/* Band 3 — Conversões */}
+          {/* Band 3 — Resultados */}
           <polygon
             points={`${xl(h2)},${h2} ${xr(h2)},${h2} ${cx},${H}`}
             fill="#10B981"
@@ -86,14 +92,14 @@ export default function FunnelMetrics({ totals }: { totals: Totals }) {
           </text>
           <text x={cx} y={h2 + 33} textAnchor="middle"
             fill="rgba(255,255,255,0.85)" fontSize="10" fontFamily="system-ui,sans-serif">
-            Conversões
+            {conversionLabel}
           </text>
         </svg>
       </div>
 
       {/* Legend with percentages */}
       <div className="space-y-1.5 mt-2">
-        {SECTIONS.map((s, i) => (
+        {sections.map((s, i) => (
           <div key={s.label} className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.fill }} />

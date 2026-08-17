@@ -79,7 +79,7 @@ export default function SharedDashboard({ client, token }: { client: Client; tok
 type GoogleMetricKey = "costBRL" | "conversions" | "impressions" | "clicks";
 const GOOGLE_METRICS: { key: GoogleMetricKey; label: string; color: string; yAxisId: string }[] = [
   { key: "costBRL",     label: "Valor Gasto",  color: "#3B82F6", yAxisId: "money"  },
-  { key: "conversions", label: "Conversões",   color: "#10B981", yAxisId: "small"  },
+  { key: "conversions", label: "Resultados",   color: "#10B981", yAxisId: "small"  },
   { key: "clicks",      label: "Cliques",      color: "#F59E0B", yAxisId: "volume" },
   { key: "impressions", label: "Impressões",   color: "#8B5CF6", yAxisId: "volume" },
 ];
@@ -225,7 +225,7 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: "Valor Gasto",  value: fmtBRL(totals.costBRL),    color: "text-blue-600"   },
-              { label: "Conversões",   value: fmtNum(totals.conversions), color: "text-emerald-600"},
+              { label: "Resultados",   value: fmtNum(totals.conversions), color: "text-emerald-600"},
               { label: "Cliques",      value: fmtNum(totals.clicks),      color: "text-amber-600"  },
               { label: "Impressões",   value: fmtNum(totals.impressions), color: "text-purple-600" },
               { label: "CTR",          value: fmtPct(totals.ctr),         color: "text-slate-700"  },
@@ -274,7 +274,7 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-slate-100 bg-slate-50">{["Campanha","Valor Investido","Impressões","Cliques","Conversões","CTR","Custo/Conv."].map((h) => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>)}</tr></thead>
+                <thead><tr className="border-b border-slate-100 bg-slate-50">{["Campanha","Valor Investido","Impressões","Cliques","Resultados","CTR","Custo/Result."].map((h) => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>)}</tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {tableCampaigns.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">Nenhuma campanha selecionada</td></tr>
                     : tableCampaigns.map((c: CampaignMetric) => (
@@ -313,7 +313,7 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
 type MetaMetricKey = "spend" | "conversions" | "impressions" | "clicks";
 const META_METRICS: { key: MetaMetricKey; label: string; color: string; yAxisId: string }[] = [
   { key: "spend",       label: "Valor Gasto",  color: "#1877F2", yAxisId: "money"  },
-  { key: "conversions", label: "Conversões",   color: "#10B981", yAxisId: "small"  },
+  { key: "conversions", label: "Resultados",   color: "#10B981", yAxisId: "small"  },
   { key: "clicks",      label: "Cliques",      color: "#F59E0B", yAxisId: "volume" },
   { key: "impressions", label: "Impressões",   color: "#8B5CF6", yAxisId: "volume" },
 ];
@@ -458,7 +458,7 @@ function MetaTab({ client, token }: { client: Client; token: string }) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: "Valor Gasto",  value: fmtBRL(totals.spend),         color: "text-[#1877F2]"  },
-              { label: "Conversões",   value: fmtNum(totals.conversions),    color: "text-emerald-600"},
+              { label: "Resultados",   value: fmtNum(totals.conversions),    color: "text-emerald-600"},
               { label: "Cliques",      value: fmtNum(totals.clicks),         color: "text-amber-600"  },
               { label: "Impressões",   value: fmtNum(totals.impressions),    color: "text-purple-600" },
               { label: "CTR",          value: fmtPct(totals.ctr),            color: "text-slate-700"  },
@@ -507,12 +507,17 @@ function MetaTab({ client, token }: { client: Client; token: string }) {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-slate-100 bg-slate-50">{["Campanha","Valor Investido","Impressões","Cliques","Conversões","CTR","Custo/Conv."].map((h) => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>)}</tr></thead>
+                <thead><tr className="border-b border-slate-100 bg-slate-50">{["Campanha","Valor Investido","Impressões","Cliques","Resultados","CTR","Custo/Result."].map((h) => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>)}</tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {tableCampaigns.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">Nenhuma campanha selecionada</td></tr>
                     : tableCampaigns.map((c: MetaCampaignMetric) => (
                       <tr key={c.id} className="hover:bg-slate-50 transition">
-                        <td className="px-4 py-3 font-medium text-slate-800 max-w-[220px] truncate">{c.name}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800 max-w-[220px]">
+                          <span className="block truncate">{c.name}</span>
+                          {c.resultType && (
+                            <span className="block text-xs font-normal text-slate-400 truncate">↳ {c.resultType}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtBRL(c.spend)}</td>
                         <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.impressions)}</td>
                         <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.clicks)}</td>

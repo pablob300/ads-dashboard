@@ -15,6 +15,8 @@ interface Props {
   clientId: string;
   subReport: SubReport;
   knownCampaignsByChannel?: Record<string, Campaign[]>;
+  /** Canais com conta vinculada no cliente. Default do picker: todos. */
+  channels?: string[];
   onUpdated: (subReport: SubReport) => void;
   onDeleted: (id: string) => void;
   onCancel: () => void;
@@ -24,6 +26,7 @@ export default function EditSubReportModal({
   clientId,
   subReport,
   knownCampaignsByChannel,
+  channels,
   onUpdated,
   onDeleted,
   onCancel,
@@ -105,6 +108,7 @@ export default function EditSubReportModal({
                 value={campaignsByChannel}
                 onChange={setCampaignsByChannel}
                 knownCampaignsByChannel={knownCampaignsByChannel}
+                channels={channels}
               />
             </div>
           </div>
