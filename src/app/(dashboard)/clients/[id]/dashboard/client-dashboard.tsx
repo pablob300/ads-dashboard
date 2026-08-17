@@ -295,8 +295,9 @@ export default function ClientDashboard({ client }: { client: Client }) {
             <ClientBalanceTooltip clientId={client.id} direction="down" />
           </div>
           <p className="text-xs text-slate-400">
-            {client.googleAdAccounts.length} conta{client.googleAdAccounts.length !== 1 ? "s" : ""} Google
-            {client.metaAdAccounts.length > 0 && ` · ${client.metaAdAccounts.length} conta${client.metaAdAccounts.length !== 1 ? "s" : ""} Meta`}
+            {hasGoogle && `${client.googleAdAccounts.length} conta${client.googleAdAccounts.length !== 1 ? "s" : ""} Google`}
+            {hasGoogle && hasMeta && " · "}
+            {hasMeta && `${client.metaAdAccounts.length} conta${client.metaAdAccounts.length !== 1 ? "s" : ""} Meta`}
           </p>
         </div>
         <Link
