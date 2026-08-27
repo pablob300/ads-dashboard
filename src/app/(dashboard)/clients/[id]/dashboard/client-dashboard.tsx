@@ -18,6 +18,8 @@ import CreateSubReportModal from "@/components/sub-reports/CreateSubReportModal"
 import EditSubReportModal from "@/components/sub-reports/EditSubReportModal";
 import { campaignIdsFor, type SubReport } from "@/lib/sub-reports";
 import { ClientBalanceTooltip } from "@/components/ClientBalanceTooltip";
+import CampaignTable from "@/components/campaigns/CampaignTable";
+import { fmtBRL, fmtNum, fmtPct, rowsFromGoogle, totalsFromGoogle } from "@/lib/campaign-columns";
 
 // ── tipos ──────────────────────────────────────────────────────────────────
 interface Client {
@@ -44,9 +46,6 @@ function defaultRange() {
   const first = new Date(today.getFullYear(), today.getMonth(), 1);
   return { start: toInputDate(first), end: toInputDate(today) };
 }
-function fmtBRL(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
-function fmtNum(v: number) { return v.toLocaleString("pt-BR"); }
-function fmtPct(v: number) { return v.toFixed(2) + "%"; }
 function fmtDate(dateStr: string) { return dateStr.split("-")[2]; }
 
 // ── componente principal ───────────────────────────────────────────────────
@@ -216,6 +215,9 @@ export default function ClientDashboard({ client }: { client: Client }) {
     () => (data?.campaigns ?? []).filter((c) => effectiveCampaigns.has(c.id)),
     [data, effectiveCampaigns]
   );
+
+  const tableRows   = useMemo(() => rowsFromGoogle(tableCampaigns), [tableCampaigns]);
+  const tableTotals = useMemo(() => totalsFromGoogle(totals), [totals]);
 
   function toggleMetric(key: MetricKey) {
     setVisibleMetrics((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -609,60 +611,13 @@ export default function ClientDashboard({ client }: { client: Client }) {
             </div>
 
             {/* Tabela */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                <h2 className="font-semibold text-slate-800 text-sm">
-                  Campanhas no período
-                  <span className="ml-2 text-slate-400 font-normal">({tableCampaigns.length})</span>
-                </h2>
-                {activeSubReport && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                    {activeSubReport.name}
-                  </span>
-                )}
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50">
-                      {["Campanha", "Valor Investido", "Impressões", "Cliques", "Resultados", "CTR", "Custo/Result."].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {tableCampaigns.length === 0 ? (
-                      <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">Nenhuma campanha selecionada</td></tr>
-                    ) : (
-                      tableCampaigns.map((c: CampaignMetric) => (
-                        <tr key={c.id} className="hover:bg-slate-50 transition">
-                          <td className="px-4 py-3 font-medium text-slate-800 max-w-[220px] truncate">{c.name}</td>
-                          <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtBRL(c.costBRL)}</td>
-                          <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.impressions)}</td>
-                          <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.clicks)}</td>
-                          <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtNum(c.conversions)}</td>
-                          <td className="px-4 py-3 text-slate-700 tabular-nums">{fmtPct(c.ctr)}</td>
-                          <td className="px-4 py-3 text-slate-700 tabular-nums">{c.conversions > 0 ? fmtBRL(c.costPerConversion) : "—"}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                  {tableCampaigns.length > 0 && (
-                    <tfoot>
-                      <tr className="border-t-2 border-slate-200 bg-slate-50">
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-600">TOTAL</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtBRL(totals.costBRL)}</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.impressions)}</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.clicks)}</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtNum(totals.conversions)}</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{fmtPct(totals.ctr)}</td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-800 tabular-nums">{totals.conversions > 0 ? fmtBRL(totals.costBRL / totals.conversions) : "—"}</td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-            </div>
+            <CampaignTable
+              channel="google"
+              title="Campanhas no período"
+              rows={tableRows}
+              totals={tableTotals}
+              badge={activeSubReport?.name}
+            />
           </>
         )}
       </>}
