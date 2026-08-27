@@ -1,4 +1,5 @@
 import { getClientByToken } from "@/lib/share-token";
+import { clientHasBudget } from "@/lib/budget-server";
 import SharedDashboard from "./shared-dashboard";
 
 export default async function SharePage({ params }: { params: Promise<{ token: string }> }) {
@@ -21,5 +22,9 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     );
   }
 
-  return <SharedDashboard client={client} token={token} />;
+  // Sem verba cadastrada em nenhum mês, o cliente nem vê a entrada do Controle
+  // de Orçamento — mesma condição usada em share/[token]/budget/page.tsx.
+  const hasBudget = await clientHasBudget(client.id);
+
+  return <SharedDashboard client={client} token={token} hasBudget={hasBudget} />;
 }

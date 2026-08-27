@@ -1,21 +1,9 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { fetchCampaignData } from "@/lib/google-ads-campaigns";
-import { fetchMetaCampaignData } from "@/lib/meta-ads-campaigns";
-import {
-  monthRange,
-  type BudgetEntryRow,
-  type GetBudgetResponse,
-} from "@/lib/budget";
-import { CHANNEL_KEYS, channelLabel, grossUpSpend } from "@/lib/channels";
-import { groupCampaignsByChannel } from "@/lib/sub-reports";
+import { buildBudgetResponse } from "@/lib/budget-server";
+import { CHANNEL_KEYS } from "@/lib/channels";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-
-interface CampaignSpend {
-  name: string;
-  raw: number;
-}
 
 export async function GET(
   req: NextRequest,
@@ -38,119 +26,17 @@ export async function GET(
   const year = Number(searchParams.get("year")) || today.getFullYear();
   const month = Number(searchParams.get("month")) || today.getMonth() + 1;
 
-  const { start, end } = monthRange(year, month);
-
-  const subReportsRaw = await prisma.subReport.findMany({
-    where: { clientId },
-    orderBy: { createdAt: "asc" },
-    include: { campaigns: true },
-  });
-
-  const savedEntries = await prisma.budgetEntry.findMany({
-    where: { clientId, year, month },
-  });
-
-  const availableChannels: string[] = [];
-  if (client.googleAdAccounts.length > 0) availableChannels.push("google");
-  if (client.metaAdAccounts.length > 0) availableChannels.push("meta");
-
-  const errors: GetBudgetResponse["errors"] = { google: null, meta: null };
-  const spendMaps: Record<string, Map<string, CampaignSpend>> = {};
-
-  if (client.googleAdAccounts.length > 0) {
-    try {
-      const connections = await prisma.googleConnection.findMany({ where: { userId } });
-      const results = await Promise.all(
-        client.googleAdAccounts.map(async (account) => {
-          const conn = connections.find((c) => c.id === account.connectionId);
-          if (!conn) return null;
-          return fetchCampaignData(
-            { accessToken: conn.accessToken, refreshToken: conn.refreshToken, expiresAt: conn.expiresAt },
-            account.customerId,
-            start,
-            end
-          );
-        })
-      );
-      const map = new Map<string, CampaignSpend>();
-      for (const r of results) {
-        if (!r) continue;
-        for (const c of r.campaigns) {
-          const existing = map.get(c.id);
-          if (existing) existing.raw += c.costBRL;
-          else map.set(c.id, { name: c.name, raw: c.costBRL });
-        }
-      }
-      spendMaps.google = map;
-    } catch (err) {
-      errors.google = err instanceof Error ? err.message : "Erro ao consultar Google Ads API";
-    }
-  }
-
-  if (client.metaAdAccounts.length > 0) {
-    try {
-      const connections = await prisma.metaConnection.findMany({ where: { userId } });
-      const results = await Promise.all(
-        client.metaAdAccounts.map(async (account) => {
-          const conn = connections.find((c) => c.id === account.connectionId);
-          if (!conn) return null;
-          return fetchMetaCampaignData(
-            { accessToken: conn.accessToken, expiresAt: conn.expiresAt },
-            account.accountId,
-            start,
-            end
-          );
-        })
-      );
-      const map = new Map<string, CampaignSpend>();
-      for (const r of results) {
-        if (!r) continue;
-        for (const c of r.campaigns) {
-          const existing = map.get(c.id);
-          if (existing) existing.raw += c.spend;
-          else map.set(c.id, { name: c.name, raw: c.spend });
-        }
-      }
-      spendMaps.meta = map;
-    } catch (err) {
-      errors.meta = err instanceof Error ? err.message : "Erro ao consultar Meta Ads API";
-    }
-  }
-
-  const entries: BudgetEntryRow[] = savedEntries.map((e) => {
-    const map = spendMaps[e.channel];
-    let campaignIds: string[];
-    let name: string;
-
-    if (e.subReportId) {
-      const sr = subReportsRaw.find((s) => s.id === e.subReportId);
-      // O sub-relatório é comum aos canais; esta verba é de um canal só, então
-      // conta apenas as campanhas daquele canal.
-      campaignIds = sr ? groupCampaignsByChannel(sr.campaigns)[e.channel] ?? [] : [];
-      name = sr?.name ?? "(sub-relatório removido)";
-    } else {
-      campaignIds = map ? Array.from(map.keys()) : [];
-      name = `Total ${channelLabel(e.channel)}`;
-    }
-
-    let spent = 0;
-    if (map) {
-      for (const id of campaignIds) {
-        spent += grossUpSpend(map.get(id)?.raw ?? 0, e.channel);
-      }
-    }
-
-    return { subReportId: e.subReportId, channel: e.channel, name, budgetAmount: e.amount, spent };
-  });
-
-  const response: GetBudgetResponse = {
+  // O cálculo mora em budget-server porque a rota pública do link compartilhado
+  // usa exatamente o mesmo — ver src/lib/budget-server.ts.
+  const response = await buildBudgetResponse(
+    clientId,
+    {
+      google: client.googleAdAccounts.map((a) => ({ connectionId: a.connectionId, customerId: a.customerId })),
+      meta: client.metaAdAccounts.map((a) => ({ connectionId: a.connectionId, accountId: a.accountId })),
+    },
     year,
-    month,
-    subReports: subReportsRaw.map((sr) => ({ id: sr.id, name: sr.name })),
-    availableChannels,
-    entries,
-    errors,
-  };
+    month
+  );
   return NextResponse.json(response);
 }
 
