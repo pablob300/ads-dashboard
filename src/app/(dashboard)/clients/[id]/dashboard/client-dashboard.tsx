@@ -19,7 +19,7 @@ import EditSubReportModal from "@/components/sub-reports/EditSubReportModal";
 import { campaignIdsFor, type SubReport } from "@/lib/sub-reports";
 import { ClientBalanceTooltip } from "@/components/ClientBalanceTooltip";
 import CampaignTable from "@/components/campaigns/CampaignTable";
-import { fmtBRL, fmtNum, fmtPct, rowsFromGoogle, totalsFromGoogle } from "@/lib/campaign-columns";
+import { fmtBRL, fmtNum, fmtPct, rowsFromGoogle } from "@/lib/campaign-columns";
 
 // ── tipos ──────────────────────────────────────────────────────────────────
 interface Client {
@@ -217,7 +217,6 @@ export default function ClientDashboard({ client }: { client: Client }) {
   );
 
   const tableRows   = useMemo(() => rowsFromGoogle(tableCampaigns), [tableCampaigns]);
-  const tableTotals = useMemo(() => totalsFromGoogle(totals), [totals]);
 
   function toggleMetric(key: MetricKey) {
     setVisibleMetrics((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -613,9 +612,8 @@ export default function ClientDashboard({ client }: { client: Client }) {
             {/* Tabela */}
             <CampaignTable
               channel="google"
-              title="Campanhas no período"
+              title="Campanhas com impressões no período"
               rows={tableRows}
-              totals={tableTotals}
               badge={activeSubReport?.name}
             />
           </>

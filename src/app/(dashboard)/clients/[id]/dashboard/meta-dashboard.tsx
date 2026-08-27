@@ -16,7 +16,7 @@ import CreateSubReportModal from "@/components/sub-reports/CreateSubReportModal"
 import EditSubReportModal from "@/components/sub-reports/EditSubReportModal";
 import { campaignIdsFor, type SubReport } from "@/lib/sub-reports";
 import CampaignTable from "@/components/campaigns/CampaignTable";
-import { fmtBRL, fmtNum, fmtPct, rowsFromMeta, totalsFromMeta } from "@/lib/campaign-columns";
+import { fmtBRL, fmtNum, fmtPct, rowsFromMeta } from "@/lib/campaign-columns";
 
 interface MetaAccount {
   id: string;
@@ -173,7 +173,6 @@ export default function MetaDashboard({
   );
 
   const tableRows   = useMemo(() => rowsFromMeta(tableCampaigns), [tableCampaigns]);
-  const tableTotals = useMemo(() => totalsFromMeta(totals), [totals]);
 
   function toggleMetric(key: MetricKey) {
     setVisibleMetrics((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -435,7 +434,6 @@ export default function MetaDashboard({
               channel="meta"
               title="Campanhas com impressões no período"
               rows={tableRows}
-              totals={tableTotals}
               badge={activeSubReport?.name}
             />
           </>

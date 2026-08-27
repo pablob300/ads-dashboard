@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   CAMPAIGN_COLUMNS,
   DEFAULT_COLUMN_ORDER,
@@ -11,17 +11,17 @@ import {
   moveColumn,
   setColumnOrder,
   subscribeColumnOrder,
+  totalsFromRows,
   type CampaignRow,
-  type CampaignTotals,
   type Channel,
   type ColumnId,
 } from "@/lib/campaign-columns";
 
 interface Props {
-  /** Título do card, ex: "Campanhas no período". */
+  /** Título do card, ex: "Campanhas com impressões no período". */
   title: string;
+  /** Já filtradas e ordenadas pelos adaptadores de `campaign-columns`. */
   rows: CampaignRow[];
-  totals: CampaignTotals;
   /** Define em qual chave do localStorage a ordem das colunas é guardada. */
   channel: Channel;
   /** Nome do sub-relatório ativo, exibido como chip ao lado do título. */
@@ -37,7 +37,9 @@ const TH_BASE = "px-4 py-3 text-left text-xs font-semibold text-slate-500 whites
  * `order`, persistido por canal no navegador de quem está vendo — tanto na versão
  * interna quanto no link compartilhado com o cliente.
  */
-export default function CampaignTable({ title, rows, totals, channel, badge }: Props) {
+export default function CampaignTable({ title, rows, channel, badge }: Props) {
+  const totals = useMemo(() => totalsFromRows(rows), [rows]);
+
   // No SSR e no primeiro render do cliente vale a ordem padrão; a ordem salva no
   // navegador entra assim que hidrata. Ver o store em `@/lib/campaign-columns`.
   const order = useSyncExternalStore(

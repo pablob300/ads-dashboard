@@ -53,8 +53,24 @@ export interface CampaignTotals {
 const cpcOf = (cost: number, clicks: number) => (clicks > 0 ? cost / clicks : 0);
 const cprOf = (cost: number, conversions: number) => (conversions > 0 ? cost / conversions : 0);
 
+/**
+ * Regra de exibição da tabela, comum a todos os canais: campanha sem impressão no
+ * período não é listada, e o que sobra vai em ordem alfabética.
+ *
+ * Fica aqui, e não em cada dashboard, para os quatro pontos que montam a tabela
+ * (Google e Meta, versão interna e link compartilhado) não poderem divergir.
+ *
+ * `numeric: true` faz "Campanha 2" vir antes de "Campanha 10"; `sensitivity: "base"`
+ * ignora caixa e acento, senão "Ótica" cairia depois de "Zebra".
+ */
+function listed(rows: CampaignRow[]): CampaignRow[] {
+  return rows
+    .filter((r) => r.impressions > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base", numeric: true }));
+}
+
 export function rowsFromGoogle(campaigns: CampaignMetric[]): CampaignRow[] {
-  return campaigns.map((c) => ({
+  return listed(campaigns.map((c) => ({
     id: c.id,
     name: c.name,
     cost: c.costBRL,
@@ -64,11 +80,11 @@ export function rowsFromGoogle(campaigns: CampaignMetric[]): CampaignRow[] {
     cpc: cpcOf(c.costBRL, c.clicks),
     conversions: c.conversions,
     costPerConversion: cprOf(c.costBRL, c.conversions),
-  }));
+  })));
 }
 
 export function rowsFromMeta(campaigns: MetaCampaignMetric[]): CampaignRow[] {
-  return campaigns.map((c) => ({
+  return listed(campaigns.map((c) => ({
     id: c.id,
     name: c.name,
     subLabel: c.resultType,
@@ -79,33 +95,30 @@ export function rowsFromMeta(campaigns: MetaCampaignMetric[]): CampaignRow[] {
     cpc: cpcOf(c.spend, c.clicks),
     conversions: c.conversions,
     costPerConversion: cprOf(c.spend, c.conversions),
-  }));
+  })));
 }
 
-interface GoogleTotalsInput { costBRL: number; impressions: number; clicks: number; conversions: number; ctr: number }
-interface MetaTotalsInput   { spend: number;   impressions: number; clicks: number; conversions: number; ctr: number }
-
-export function totalsFromGoogle(t: GoogleTotalsInput): CampaignTotals {
+/**
+ * TOTAL da tabela, somado a partir das linhas realmente exibidas.
+ *
+ * Deriva das linhas, e não do `totals` que os dashboards já calculam, porque aquele
+ * cobre toda a seleção — incluindo campanha sem impressão, que a tabela agora esconde.
+ * Um TOTAL que não fecha com a soma da própria coluna parece defeito. Os KPIs no topo
+ * da tela continuam com o total da seleção inteira, que é outra pergunta.
+ */
+export function totalsFromRows(rows: CampaignRow[]): CampaignTotals {
+  const cost        = rows.reduce((s, r) => s + r.cost, 0);
+  const impressions = rows.reduce((s, r) => s + r.impressions, 0);
+  const clicks      = rows.reduce((s, r) => s + r.clicks, 0);
+  const conversions = rows.reduce((s, r) => s + r.conversions, 0);
   return {
-    cost: t.costBRL,
-    impressions: t.impressions,
-    clicks: t.clicks,
-    ctr: t.ctr,
-    cpc: cpcOf(t.costBRL, t.clicks),
-    conversions: t.conversions,
-    costPerConversion: cprOf(t.costBRL, t.conversions),
-  };
-}
-
-export function totalsFromMeta(t: MetaTotalsInput): CampaignTotals {
-  return {
-    cost: t.spend,
-    impressions: t.impressions,
-    clicks: t.clicks,
-    ctr: t.ctr,
-    cpc: cpcOf(t.spend, t.clicks),
-    conversions: t.conversions,
-    costPerConversion: cprOf(t.spend, t.conversions),
+    cost,
+    impressions,
+    clicks,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+    cpc: cpcOf(cost, clicks),
+    conversions,
+    costPerConversion: cprOf(cost, conversions),
   };
 }
 

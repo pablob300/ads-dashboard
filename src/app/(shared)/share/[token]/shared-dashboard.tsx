@@ -12,7 +12,7 @@ import SubReportChips from "@/components/sub-reports/SubReportChips";
 import FunnelMetrics from "@/components/sub-reports/FunnelMetrics";
 import { campaignIdsFor, type SubReport } from "@/lib/sub-reports";
 import CampaignTable from "@/components/campaigns/CampaignTable";
-import { fmtBRL, fmtNum, fmtPct, rowsFromGoogle, rowsFromMeta, totalsFromGoogle, totalsFromMeta } from "@/lib/campaign-columns";
+import { fmtBRL, fmtNum, fmtPct, rowsFromGoogle, rowsFromMeta } from "@/lib/campaign-columns";
 
 interface Client {
   id: string;
@@ -160,7 +160,6 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
 
   const tableCampaigns = useMemo(() => (data?.campaigns ?? []).filter((c) => effectiveCampaigns.has(c.id)), [data, effectiveCampaigns]);
   const tableRows   = useMemo(() => rowsFromGoogle(tableCampaigns), [tableCampaigns]);
-  const tableTotals = useMemo(() => totalsFromGoogle(totals), [totals]);
 
   function handleSelectSubReport(sr: SubReport | null) {
     setActiveSubReport(sr);
@@ -270,9 +269,8 @@ function GoogleTab({ client, token }: { client: Client; token: string }) {
 
           <CampaignTable
             channel="google"
-            title="Campanhas no período"
+            title="Campanhas com impressões no período"
             rows={tableRows}
-            totals={tableTotals}
             badge={activeSubReport?.name}
           />
         </>
@@ -366,7 +364,6 @@ function MetaTab({ client, token }: { client: Client; token: string }) {
 
   const tableCampaigns = useMemo(() => (data?.campaigns ?? []).filter((c) => effectiveCampaigns.has(c.id)), [data, effectiveCampaigns]);
   const tableRows   = useMemo(() => rowsFromMeta(tableCampaigns), [tableCampaigns]);
-  const tableTotals = useMemo(() => totalsFromMeta(totals), [totals]);
 
   function handleSelectSubReport(sr: SubReport | null) {
     setActiveSubReport(sr);
@@ -478,7 +475,6 @@ function MetaTab({ client, token }: { client: Client; token: string }) {
             channel="meta"
             title="Campanhas com impressões no período"
             rows={tableRows}
-            totals={tableTotals}
             badge={activeSubReport?.name}
           />
         </>
